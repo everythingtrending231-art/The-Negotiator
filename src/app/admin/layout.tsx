@@ -11,6 +11,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <nav className="flex items-center gap-5 text-sm font-bold">
             <span style={{ color: "#123FA9" }}>Admin</span>
+            <Link href="/admin/analytics" className="text-slate-600 hover:text-slate-900">
+              Analytics
+            </Link>
             <Link href="/admin/categories" className="text-slate-600 hover:text-slate-900">
               Categories
             </Link>

@@ -1,7 +1,6 @@
 import Link from "next/link"
 import { prisma } from "@/server/db"
 import { Badge } from "@/components/ui/badge"
-import LogoutButton from "@/components/logout-button"
 import type { CaseStatus } from "@prisma/client"
 import { CaseStatus as CaseStatusEnum } from "@prisma/client"
 
@@ -28,7 +27,6 @@ export default async function NegotiatorCasesPage({
         <h1 className="text-2xl font-black" style={{ color: "#123FA9" }}>
           Cases
         </h1>
-        <LogoutButton />
       </div>
 
       <div className="flex flex-wrap gap-2 mb-6">
