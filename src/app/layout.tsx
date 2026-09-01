@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { Archivo, Lora } from "next/font/google"
+import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
 // Brand direction calls for Liberation Sans — not distributed as a webfont
@@ -38,7 +39,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${archivo.variable} ${lora.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Toaster position="top-right" richColors closeButton />
+      </body>
     </html>
   )
 }

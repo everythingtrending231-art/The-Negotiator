@@ -17,6 +17,14 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground shadow hover:bg-destructive/80",
         outline: "text-foreground",
+        // Soft status chips — for status/state vocabularies (case status,
+        // verification status, invite/offer status) where a filled badge
+        // would compete with real primary actions on the same screen.
+        amber: "border-amber-200 bg-amber-50 text-amber-700",
+        cobalt: "border-cobalt-100 bg-cobalt-50 text-cobalt-700",
+        success: "border-emerald-200 bg-emerald-50 text-emerald-700",
+        danger: "border-rose-200 bg-rose-50 text-rose-700",
+        neutral: "border-slate-200 bg-slate-100 text-slate-600",
       },
     },
     defaultVariants: {
