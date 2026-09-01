@@ -11,7 +11,15 @@ export default function SiteHeader({ tagline }: { tagline?: string }) {
         <NegotiatorMark size={32} />
         <span className="font-black text-lg tracking-tight text-cobalt-600">The Negotiator</span>
       </Link>
-      {tagline && <span className="hidden sm:inline text-sm italic font-serif text-ink-soft">{tagline}</span>}
+      <div className="flex items-center gap-4">
+        {tagline && <span className="hidden sm:inline text-sm italic font-serif text-ink-soft">{tagline}</span>}
+        <Link
+          href="/login"
+          className="text-sm font-bold text-cobalt-600 opacity-80 hover:opacity-100 hover:underline underline-offset-4 transition-opacity"
+        >
+          Sign in
+        </Link>
+      </div>
     </header>
   )
 }
