@@ -2,11 +2,16 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import StatusBadge from "@/components/status-badge"
+import { statusLabel } from "@/lib/status-badge"
 import {
   Select,
   SelectContent,
@@ -15,24 +20,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { formatCents } from "@/lib/money"
+import { CaseStatus as CaseStatusEnum } from "@prisma/client"
+import { cn } from "@/lib/utils"
 
-const CASE_STATUSES = [
-  "DRAFT",
-  "SUBMITTED",
-  "UNDER_REVIEW",
-  "ASSIGNED",
-  "NEGOTIATING",
-  "AWAITING_BUSINESS",
-  "AWAITING_CUSTOMER",
-  "OFFER_READY",
-  "ACCEPTED",
-  "DECLINED",
-  "EXPIRED",
-  "CANCELLED",
-  "COMPLETED",
-  "DISPUTED",
-  "CLOSED",
-]
+const CASE_STATUSES = Object.values(CaseStatusEnum)
 
 type NegotiationCase = {
   id: string
@@ -78,6 +69,8 @@ type Invite = {
   respondedAt: string | null
 }
 
+type ActionKey = "assign" | "status" | "invite" | "note" | "message"
+
 export default function CaseDetail(props: {
   negotiationCase: NegotiationCase
   messages: Message[]
@@ -89,7 +82,7 @@ export default function CaseDetail(props: {
   businesses: Business[]
 }) {
   const router = useRouter()
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<Partial<Record<ActionKey, boolean>>>({})
   const [status, setStatus] = useState(props.negotiationCase.status)
   const [note, setNote] = useState("")
   const [message, setMessage] = useState("")
@@ -97,36 +90,50 @@ export default function CaseDetail(props: {
   const [showInviteForm, setShowInviteForm] = useState(false)
   const [selectedBusinessIds, setSelectedBusinessIds] = useState<string[]>([])
 
-  async function withBusy(fn: () => Promise<void>) {
-    setBusy(true)
+  async function runAction(key: ActionKey, fn: () => Promise<Response>, successMessage: string) {
+    setBusy((b) => ({ ...b, [key]: true }))
     try {
-      await fn()
+      const res = await fn()
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        toast.error(body?.error ?? "That didn't go through.")
+        return false
+      }
+      toast.success(successMessage)
       router.refresh()
+      return true
+    } catch {
+      toast.error("That didn't go through — check your connection and try again.")
+      return false
     } finally {
-      setBusy(false)
+      setBusy((b) => ({ ...b, [key]: false }))
     }
   }
 
   async function assignToMe() {
-    await withBusy(() =>
-      fetch(`/api/negotiator/cases/${props.negotiationCase.id}/assign`, {
-        method: "POST",
-      }).then(() => undefined),
+    await runAction(
+      "assign",
+      () => fetch(`/api/negotiator/cases/${props.negotiationCase.id}/assign`, { method: "POST" }),
+      "Assigned to you."
     )
   }
 
   async function sendInvites() {
     if (selectedBusinessIds.length === 0) return
-    await withBusy(() =>
-      fetch(`/api/negotiator/cases/${props.negotiationCase.id}/invites`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ businessIds: selectedBusinessIds }),
-      }).then(() => {
-        setSelectedBusinessIds([])
-        setShowInviteForm(false)
-      }),
+    const ok = await runAction(
+      "invite",
+      () =>
+        fetch(`/api/negotiator/cases/${props.negotiationCase.id}/invites`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ businessIds: selectedBusinessIds }),
+        }),
+      `Sent to ${selectedBusinessIds.length} business${selectedBusinessIds.length === 1 ? "" : "es"}.`
     )
+    if (ok) {
+      setSelectedBusinessIds([])
+      setShowInviteForm(false)
+    }
   }
 
   function toggleBusiness(businessId: string) {
@@ -136,87 +143,95 @@ export default function CaseDetail(props: {
   }
 
   async function updateStatus() {
-    await withBusy(() =>
-      fetch(`/api/negotiator/cases/${props.negotiationCase.id}/status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      }).then(() => undefined),
+    await runAction(
+      "status",
+      () =>
+        fetch(`/api/negotiator/cases/${props.negotiationCase.id}/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        }),
+      `Status updated to ${statusLabel(status)}.`
     )
   }
 
   async function addNote() {
     if (!note.trim()) return
-    await withBusy(() =>
-      fetch(`/api/negotiator/cases/${props.negotiationCase.id}/note`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: note }),
-      }).then(() => setNote("")),
+    const ok = await runAction(
+      "note",
+      () =>
+        fetch(`/api/negotiator/cases/${props.negotiationCase.id}/note`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: note }),
+        }),
+      "Note added."
     )
+    if (ok) setNote("")
   }
 
   async function sendMessage() {
     if (!message.trim()) return
-    await withBusy(() =>
-      fetch(`/api/negotiator/cases/${props.negotiationCase.id}/message`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: message }),
-      }).then(() => setMessage("")),
+    const ok = await runAction(
+      "message",
+      () =>
+        fetch(`/api/negotiator/cases/${props.negotiationCase.id}/message`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: message }),
+        }),
+      "Sent to customer."
     )
+    if (ok) setMessage("")
   }
 
   const c = props.negotiationCase
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="max-w-4xl mx-auto px-4 py-10 space-y-6">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="flex items-center justify-between"
+      >
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#F5A623" }}>
-            {c.publicRef}
-          </p>
-          <h1 className="text-2xl font-black" style={{ color: "#123FA9" }}>
-            {c.categoryName}
-          </h1>
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-600">{c.publicRef}</p>
+          <h1 className="text-2xl font-black text-cobalt-600">{c.categoryName}</h1>
         </div>
-        <Badge>{c.status}</Badge>
-      </div>
+        <StatusBadge status={c.status} />
+      </motion.div>
 
-      <div className="bg-white rounded-xl shadow p-6 space-y-2">
-        <p className="text-sm text-slate-500">Customer: {c.customerEmail}</p>
+      {/* Persistent case-context panel — always visible regardless of which
+          tab below is active, so the negotiator never loses the thread. */}
+      <Card className="p-6 space-y-3">
+        <p className="text-sm text-ink-muted">Customer: {c.customerEmail}</p>
         <p>{c.description}</p>
         {c.url && (
           <p className="text-sm">
             Link:{" "}
-            <a href={c.url} className="underline" style={{ color: "#123FA9" }}>
+            <a href={c.url} className="underline text-cobalt-600">
               {c.url}
             </a>
           </p>
         )}
-        <div className="text-sm text-slate-600 grid grid-cols-2 gap-1">
+        <div className="text-sm text-ink-soft grid grid-cols-2 gap-1">
           {c.targetPriceCents != null && <p>Target price: {formatCents(c.targetPriceCents, c.currency)}</p>}
           {c.maxBudgetCents != null && <p>Max budget: {formatCents(c.maxBudgetCents, c.currency)}</p>}
           {c.quantity != null && <p>Quantity: {c.quantity}</p>}
           {c.location && <p>Location: {c.location}</p>}
         </div>
-        {c.notes && <p className="text-sm text-slate-500">Notes: {c.notes}</p>}
-        {c.businessName && <p className="text-sm text-slate-600">Business: {c.businessName}</p>}
-      </div>
+        {c.notes && <p className="text-sm text-ink-muted">Notes: {c.notes}</p>}
+        {c.businessName && <p className="text-sm text-ink-soft">Business: {c.businessName}</p>}
 
-      <div className="bg-white rounded-xl shadow p-6 space-y-4">
-        <p className="text-sm text-slate-600">
-          Signed in as <span className="font-bold">{props.currentNegotiator.name}</span>
-        </p>
-
-        <div className="flex flex-wrap items-center gap-3 pt-2 border-t">
-          <p className="text-sm text-slate-600">Assigned: {c.assignedNegotiatorName ?? "Unassigned"}</p>
-          <Button size="sm" disabled={busy} onClick={assignToMe}>
-            Assign to me
+        <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-border">
+          <p className="text-sm text-ink-soft">Assigned: {c.assignedNegotiatorName ?? "Unassigned"}</p>
+          <Button size="sm" disabled={busy.assign} onClick={assignToMe}>
+            {busy.assign ? "Assigning…" : "Assign to me"}
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 pt-2 border-t">
+        <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-border">
           <Select value={status} onValueChange={setStatus}>
             <SelectTrigger className="w-56">
               <SelectValue />
@@ -224,197 +239,242 @@ export default function CaseDetail(props: {
             <SelectContent>
               {CASE_STATUSES.map((s) => (
                 <SelectItem key={s} value={s}>
-                  {s}
+                  {statusLabel(s)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Button size="sm" disabled={busy} onClick={updateStatus}>
-            Update status
+          <Button size="sm" disabled={busy.status} onClick={updateStatus}>
+            {busy.status ? "Updating…" : "Update status"}
           </Button>
         </div>
-      </div>
+      </Card>
 
-      <div className="bg-white rounded-xl shadow p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold" style={{ color: "#123FA9" }}>
-            Requests sent
-          </h2>
-          <Button size="sm" variant="outline" onClick={() => setShowInviteForm((v) => !v)}>
-            {showInviteForm ? "Cancel" : "Send request"}
-          </Button>
-        </div>
-        <p className="text-xs text-slate-400">
-          Route this request to one or more businesses so they can see it and decide whether to engage, before any
-          offer terms exist. Once you draft an offer for one, any other still-pending requests are withdrawn
-          automatically.
-        </p>
+      <Tabs defaultValue="overview">
+        <TabsList>
+          <TabsTrigger value="overview">Requests</TabsTrigger>
+          <TabsTrigger value="offers">Offers ({props.offers.length})</TabsTrigger>
+          <TabsTrigger value="conversation">Messages &amp; notes</TabsTrigger>
+          <TabsTrigger value="audit">Audit</TabsTrigger>
+        </TabsList>
 
-        {props.invites.length === 0 && <p className="text-sm text-slate-500">No requests sent yet.</p>}
-        <div className="space-y-2">
-          {props.invites.map((invite) => (
-            <div key={invite.id} className="border rounded-lg p-3 flex items-center justify-between">
-              <div>
-                <p className="font-bold text-sm">{invite.businessName}</p>
-                {invite.responseNote && <p className="text-xs text-slate-500">&ldquo;{invite.responseNote}&rdquo;</p>}
-              </div>
-              <div className="text-right text-xs text-slate-400">
-                <Badge variant={invite.status === "PENDING" ? "outline" : "default"}>{invite.status}</Badge>
-                {invite.respondedByName && (
-                  <p className="mt-1">
-                    {invite.respondedByName} · {new Date(invite.respondedAt!).toLocaleString()}
-                  </p>
-                )}
-              </div>
+        <TabsContent value="overview">
+          <Card className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-cobalt-600">Requests sent</h2>
+              <Button size="sm" variant="outline" onClick={() => setShowInviteForm((v) => !v)}>
+                {showInviteForm ? "Cancel" : "Send request"}
+              </Button>
             </div>
-          ))}
-        </div>
+            <p className="text-xs text-ink-muted">
+              Route this request to one or more businesses so they can see it and decide whether to engage, before
+              any offer terms exist. Once you draft an offer for one, any other still-pending requests are withdrawn
+              automatically.
+            </p>
 
-        {showInviteForm && (
-          <div className="border rounded-lg p-4 space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              {props.businesses.map((business) => {
-                const alreadyInvited = props.invites.some((i) => i.businessId === business.id)
+            {props.invites.length === 0 && <p className="text-sm text-ink-muted">No requests sent yet.</p>}
+            <div className="space-y-2">
+              {props.invites.map((invite) => (
+                <div key={invite.id} className="border border-border rounded-lg p-3 flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-sm">{invite.businessName}</p>
+                    {invite.responseNote && (
+                      <p className="text-xs text-ink-muted">&ldquo;{invite.responseNote}&rdquo;</p>
+                    )}
+                  </div>
+                  <div className="text-right text-xs text-ink-muted">
+                    <StatusBadge status={invite.status} />
+                    {invite.respondedByName && (
+                      <p className="mt-1">
+                        {invite.respondedByName} · {new Date(invite.respondedAt!).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <AnimatePresence>
+              {showInviteForm && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="overflow-hidden"
+                >
+                  <div className="border border-border rounded-lg p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {props.businesses.map((business) => {
+                        const alreadyInvited = props.invites.some((i) => i.businessId === business.id)
+                        return (
+                          <label
+                            key={business.id}
+                            className={cn("flex items-center gap-2 text-sm", alreadyInvited && "text-ink-muted/50")}
+                          >
+                            <input
+                              type="checkbox"
+                              disabled={alreadyInvited}
+                              checked={selectedBusinessIds.includes(business.id)}
+                              onChange={() => toggleBusiness(business.id)}
+                            />
+                            {business.name}
+                            {alreadyInvited && " (already invited)"}
+                          </label>
+                        )
+                      })}
+                    </div>
+                    <Button size="sm" disabled={busy.invite || selectedBusinessIds.length === 0} onClick={sendInvites}>
+                      {busy.invite
+                        ? "Sending…"
+                        : `Send to ${selectedBusinessIds.length || ""} business${selectedBusinessIds.length === 1 ? "" : "es"}`}
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="offers">
+          <Card className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-cobalt-600">Offers</h2>
+              <Button size="sm" variant="outline" onClick={() => setShowOfferForm((v) => !v)}>
+                {showOfferForm ? "Cancel" : "New offer"}
+              </Button>
+            </div>
+            <p className="text-xs text-ink-muted">
+              After negotiating terms with the business by phone, draft the offer here — the business must confirm
+              it via their portal before the customer ever sees it.
+            </p>
+
+            {props.offers.length === 0 && <p className="text-sm text-ink-muted">No offers yet.</p>}
+            <div className="space-y-2">
+              {props.offers.map((offer) => (
+                <div key={offer.id} className="border border-border rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold">{formatCents(offer.finalPriceCents, offer.currency)}</p>
+                      <p className="text-sm text-ink-muted">{offer.includedGoods}</p>
+                    </div>
+                    <div className="text-right">
+                      <StatusBadge status={offer.status} />
+                      {offer.customerDecision && (
+                        <p className="text-xs text-ink-muted mt-1">Customer: {statusLabel(offer.customerDecision)}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-border text-xs">
+                    {offer.businessConfirmedAt ? (
+                      <p className="text-emerald-700 font-bold">
+                        Confirmed by {offer.businessContactName ?? "business"} on{" "}
+                        {new Date(offer.businessConfirmedAt).toLocaleString()}
+                      </p>
+                    ) : offer.businessFeedback ? (
+                      <p className="text-amber-700 font-bold">Business requested changes: {offer.businessFeedback}</p>
+                    ) : (
+                      <p className="text-ink-muted">Awaiting business confirmation</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <AnimatePresence>
+              {showOfferForm && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="overflow-hidden"
+                >
+                  <OfferForm
+                    caseId={c.id}
+                    businesses={props.businesses}
+                    defaultCurrency={c.currency}
+                    maxBudgetCents={c.maxBudgetCents}
+                    onDone={() => {
+                      setShowOfferForm(false)
+                      toast.success("Offer created — awaiting business confirmation.")
+                      router.refresh()
+                    }}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="conversation" className="space-y-6">
+          <Card className="p-6 space-y-4">
+            <h2 className="font-bold text-cobalt-600">Internal notes</h2>
+            <p className="text-xs text-ink-muted">Never visible to the customer.</p>
+            <div className="space-y-2">
+              {props.notes.map((n) => (
+                <div key={n.id} className="bg-amber-50 rounded-lg p-3">
+                  <p className="text-xs text-ink-muted">
+                    {n.negotiatorName} · {new Date(n.createdAt).toLocaleString()}
+                  </p>
+                  <p className="text-sm">{n.body}</p>
+                </div>
+              ))}
+            </div>
+            <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a private note…" />
+            <Button size="sm" disabled={busy.note || !note.trim()} onClick={addNote}>
+              {busy.note ? "Adding…" : "Add note"}
+            </Button>
+          </Card>
+
+          <Card className="p-6 space-y-4">
+            <h2 className="font-bold text-cobalt-600">Messages with customer</h2>
+            <div className="space-y-2">
+              {props.messages.map((m) => {
+                const fromNegotiator = m.authorType === "NEGOTIATOR"
                 return (
-                  <label
-                    key={business.id}
-                    className={`flex items-center gap-2 text-sm ${alreadyInvited ? "text-slate-300" : ""}`}
-                  >
-                    <input
-                      type="checkbox"
-                      disabled={alreadyInvited}
-                      checked={selectedBusinessIds.includes(business.id)}
-                      onChange={() => toggleBusiness(business.id)}
-                    />
-                    {business.name}
-                    {alreadyInvited && " (already invited)"}
-                  </label>
+                  <div key={m.id} className={cn("flex flex-col", fromNegotiator ? "items-end" : "items-start")}>
+                    <p className="text-xs text-ink-muted">
+                      {fromNegotiator ? m.authorName ?? "Negotiator" : "Customer"} ·{" "}
+                      {new Date(m.createdAt).toLocaleString()}
+                    </p>
+                    <p
+                      className={cn(
+                        "text-sm rounded-lg px-3 py-2 max-w-[85%]",
+                        fromNegotiator ? "bg-cobalt-50 text-cobalt-700" : "bg-slate-100 text-ink"
+                      )}
+                    >
+                      {m.body}
+                    </p>
+                  </div>
                 )
               })}
             </div>
-            <Button size="sm" disabled={busy || selectedBusinessIds.length === 0} onClick={sendInvites}>
-              Send to {selectedBusinessIds.length || ""} business{selectedBusinessIds.length === 1 ? "" : "es"}
+            <Textarea
+              rows={2}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Ask the customer a question…"
+            />
+            <Button size="sm" disabled={busy.message || !message.trim()} onClick={sendMessage}>
+              {busy.message ? "Sending…" : "Send to customer"}
             </Button>
-          </div>
-        )}
-      </div>
+          </Card>
+        </TabsContent>
 
-      <div className="bg-white rounded-xl shadow p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold" style={{ color: "#123FA9" }}>
-            Offers
-          </h2>
-          <Button size="sm" variant="outline" onClick={() => setShowOfferForm((v) => !v)}>
-            {showOfferForm ? "Cancel" : "New offer"}
-          </Button>
-        </div>
-        <p className="text-xs text-slate-400">
-          After negotiating terms with the business by phone, draft the offer here — the business must confirm it
-          via their portal before the customer ever sees it.
-        </p>
-
-        {props.offers.length === 0 && <p className="text-sm text-slate-500">No offers yet.</p>}
-        <div className="space-y-2">
-          {props.offers.map((offer) => (
-            <div key={offer.id} className="border rounded-lg p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold">{formatCents(offer.finalPriceCents, offer.currency)}</p>
-                  <p className="text-sm text-slate-500">{offer.includedGoods}</p>
-                </div>
-                <div className="text-right text-xs text-slate-400">
-                  <p>{offer.status}</p>
-                  {offer.customerDecision && <p>Customer: {offer.customerDecision}</p>}
-                </div>
-              </div>
-              <div className="mt-2 pt-2 border-t text-xs">
-                {offer.businessConfirmedAt ? (
-                  <p className="text-emerald-700 font-bold">
-                    Confirmed by {offer.businessContactName ?? "business"} on{" "}
-                    {new Date(offer.businessConfirmedAt).toLocaleString()}
-                  </p>
-                ) : offer.businessFeedback ? (
-                  <p className="text-amber-700 font-bold">Business requested changes: {offer.businessFeedback}</p>
-                ) : (
-                  <p className="text-slate-400">Awaiting business confirmation</p>
-                )}
-              </div>
+        <TabsContent value="audit">
+          <Card className="p-6 space-y-2">
+            <h2 className="font-bold text-cobalt-600">Audit log</h2>
+            <div className="space-y-1 text-xs text-ink-muted">
+              {props.auditLogs.map((a) => (
+                <p key={a.id}>
+                  {new Date(a.createdAt).toLocaleString()} · {a.action} · {a.actorType} ({a.sourceChannel})
+                </p>
+              ))}
             </div>
-          ))}
-        </div>
-
-        {showOfferForm && (
-          <OfferForm
-            caseId={c.id}
-            businesses={props.businesses}
-            defaultCurrency={c.currency}
-            onDone={() => {
-              setShowOfferForm(false)
-              router.refresh()
-            }}
-          />
-        )}
-      </div>
-
-      <div className="bg-white rounded-xl shadow p-6 space-y-4">
-        <h2 className="font-bold" style={{ color: "#123FA9" }}>
-          Internal notes
-        </h2>
-        <p className="text-xs text-slate-400">Never visible to the customer.</p>
-        <div className="space-y-2">
-          {props.notes.map((n) => (
-            <div key={n.id} className="bg-amber-50 rounded-lg p-3">
-              <p className="text-xs text-slate-400">
-                {n.negotiatorName} · {new Date(n.createdAt).toLocaleString()}
-              </p>
-              <p className="text-sm">{n.body}</p>
-            </div>
-          ))}
-        </div>
-        <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a private note…" />
-        <Button size="sm" disabled={busy || !note.trim()} onClick={addNote}>
-          Add note
-        </Button>
-      </div>
-
-      <div className="bg-white rounded-xl shadow p-6 space-y-4">
-        <h2 className="font-bold" style={{ color: "#123FA9" }}>
-          Messages with customer
-        </h2>
-        <div className="space-y-2">
-          {props.messages.map((m) => (
-            <div key={m.id}>
-              <p className="text-xs text-slate-400">
-                {m.authorType === "CUSTOMER" ? "Customer" : m.authorName ?? "Negotiator"} ·{" "}
-                {new Date(m.createdAt).toLocaleString()}
-              </p>
-              <p className="text-sm bg-slate-100 rounded-lg px-3 py-2 inline-block">{m.body}</p>
-            </div>
-          ))}
-        </div>
-        <Textarea
-          rows={2}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Ask the customer a question…"
-        />
-        <Button size="sm" disabled={busy || !message.trim()} onClick={sendMessage}>
-          Send to customer
-        </Button>
-      </div>
-
-      <div className="bg-white rounded-xl shadow p-6 space-y-2">
-        <h2 className="font-bold" style={{ color: "#123FA9" }}>
-          Audit log
-        </h2>
-        <div className="space-y-1 text-xs text-slate-500">
-          {props.auditLogs.map((a) => (
-            <p key={a.id}>
-              {new Date(a.createdAt).toLocaleString()} · {a.action} · {a.actorType} ({a.sourceChannel})
-            </p>
-          ))}
-        </div>
-      </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
@@ -423,6 +483,7 @@ function OfferForm(props: {
   caseId: string
   businesses: Business[]
   defaultCurrency: string
+  maxBudgetCents: number | null
   onDone: () => void
 }) {
   const [businessId, setBusinessId] = useState(props.businesses[0]?.id ?? "")
@@ -436,6 +497,10 @@ function OfferForm(props: {
   const [validUntil, setValidUntil] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const finalPriceCents = Math.round(parseFloat(finalPrice) * 100)
+  const overBudget =
+    props.maxBudgetCents != null && !Number.isNaN(finalPriceCents) && finalPriceCents > props.maxBudgetCents
 
   async function submit() {
     if (!businessId || !finalPrice || !includedGoods.trim()) {
@@ -463,14 +528,16 @@ function OfferForm(props: {
     setSubmitting(false)
     if (!res.ok) {
       const body = await res.json().catch(() => null)
-      setError(body?.error ?? "Couldn't create the offer.")
+      const message = body?.error ?? "Couldn't create the offer."
+      setError(message)
+      toast.error(message)
       return
     }
     props.onDone()
   }
 
   return (
-    <div className="border rounded-lg p-4 space-y-3">
+    <div className="border border-border rounded-lg p-4 space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label>Business</Label>
@@ -500,6 +567,16 @@ function OfferForm(props: {
           <Input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
         </div>
       </div>
+
+      {overBudget && (
+        <p className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          This price is above the customer&apos;s stated max budget
+          {props.maxBudgetCents != null && ` (${formatCents(props.maxBudgetCents, props.defaultCurrency)})`}. Per
+          the negotiation SOP, don&apos;t exceed the customer&apos;s max without approval — double-check before
+          creating this offer.
+        </p>
+      )}
+
       <div className="space-y-1">
         <Label>Included goods / services</Label>
         <Textarea rows={2} value={includedGoods} onChange={(e) => setIncludedGoods(e.target.value)} />
