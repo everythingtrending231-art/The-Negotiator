@@ -1,16 +1,17 @@
-import NegotiatorMark from './NegotiatorMark'
+import Link from "next/link"
+import NegotiatorMark from "@/components/negotiator-mark"
 
-const COBALT = '#123FA9'
-const AMBER = '#F5A623'
-const CREAM = '#F7F5F0'
-const INK = '#0B1220'
+const COBALT = "#123FA9"
+const AMBER = "#F5A623"
+const CREAM = "#F7F5F0"
+const INK = "#0B1220"
 
 function Squiggle({ className, flip = false }: { className?: string; flip?: boolean }) {
   return (
     <svg
       viewBox="0 0 200 200"
       className={className}
-      style={{ transform: flip ? 'scaleX(-1)' : undefined }}
+      style={{ transform: flip ? "scaleX(-1)" : undefined }}
       aria-hidden="true"
     >
       <path
@@ -35,7 +36,7 @@ function ValueBadge({ label }: { label: string }) {
   )
 }
 
-function App() {
+export default function HomePage() {
   return (
     <div
       className="min-h-screen w-full relative overflow-hidden flex flex-col"
@@ -56,7 +57,7 @@ function App() {
         </div>
         <span
           className="hidden sm:inline text-sm italic"
-          style={{ fontFamily: 'Lora, serif', color: '#4a4a4a' }}
+          style={{ fontFamily: "Lora, serif", color: "#4a4a4a" }}
         >
           You ask. We negotiate.
         </span>
@@ -75,31 +76,33 @@ function App() {
 
           <h1
             className="font-black leading-[1.05] mb-5"
-            style={{ color: COBALT, fontSize: 'clamp(2.4rem, 5vw, 3.6rem)' }}
+            style={{ color: COBALT, fontSize: "clamp(2.4rem, 5vw, 3.6rem)" }}
           >
-            Don't take
+            Don&apos;t take
             <br />
             the first price.
           </h1>
 
-          <p className="text-lg mb-8" style={{ color: '#333' }}>
-            Tell us what you're trying to buy, book, or get. A real human
+          <p className="text-lg mb-8" style={{ color: "#333" }}>
+            Tell us what you&apos;re trying to buy, book, or get. A real human
             Negotiator goes to work on it — you decide when the offer comes back.
           </p>
 
           <div className="flex flex-wrap gap-4 mb-8">
-            <button
+            <Link
+              href="/request"
               className="px-7 py-4 rounded-full font-bold text-white text-base transition-transform hover:scale-[1.03] active:scale-[0.98]"
               style={{ backgroundColor: COBALT }}
             >
               Negotiate This For Me
-            </button>
-            <button
+            </Link>
+            <Link
+              href="/request"
               className="px-7 py-4 rounded-full font-bold text-base border-2 transition-transform hover:scale-[1.03] active:scale-[0.98]"
               style={{ borderColor: COBALT, color: COBALT }}
             >
               See How It Works
-            </button>
+            </Link>
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -126,7 +129,7 @@ function App() {
                 In progress
               </p>
               <p className="text-sm font-bold" style={{ color: INK }}>
-                We're negotiating with the business now
+                We&apos;re negotiating with the business now
               </p>
             </div>
 
@@ -139,7 +142,7 @@ function App() {
                 A
               </div>
               <div>
-                <p className="text-xs" style={{ color: '#666' }}>Your Negotiator</p>
+                <p className="text-xs" style={{ color: "#666" }}>Your Negotiator</p>
                 <p className="text-sm font-bold" style={{ color: INK }}>Amara is on it</p>
               </div>
             </div>
@@ -152,12 +155,10 @@ function App() {
         <span className="text-xs font-bold" style={{ color: COBALT }}>
           © The Negotiator
         </span>
-        <span className="text-xs" style={{ color: '#666' }}>
+        <span className="text-xs" style={{ color: "#666" }}>
           Human negotiators. Real deals. No robots.
         </span>
       </footer>
     </div>
   )
 }
-
-export default App

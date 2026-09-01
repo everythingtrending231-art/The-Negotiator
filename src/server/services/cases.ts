@@ -1,0 +1,249 @@
+import type { ActorType, CaseStatus, Prisma } from "@prisma/client"
+import { prisma } from "@/server/db"
+import { recordAudit } from "@/server/audit"
+import { issueAccessToken, revokeTicketTokens, buildCaseUrl } from "@/server/services/tokens"
+import { sendEmail } from "@/server/email/send"
+
+// PRD §7 names these five as terminal (they trigger dashboard-access
+// closure per §6a). Completed/Disputed are treated as non-terminal
+// intermediate states a Negotiator must manually move out of — the docs
+// don't define their relationship to Closed, so this is an
+// implementation default, not a documented rule (see plan assumption 2).
+const TERMINAL_STATUSES: CaseStatus[] = ["ACCEPTED", "DECLINED", "EXPIRED", "CANCELLED", "CLOSED"]
+
+export function isTerminal(status: CaseStatus) {
+  return TERMINAL_STATUSES.includes(status)
+}
+
+function generatePublicRef(sequence: number) {
+  return `NEG-${String(sequence).padStart(6, "0")}`
+}
+
+// Shared by every path that can move a case into a terminal status
+// (manual internal status change, and customer accept/decline) so
+// token-revocation + one-time closure-email guarding only lives in one
+// place.
+export async function applyStatusChangeInTx(
+  tx: Prisma.TransactionClient,
+  negotiationCase: { id: string; status: CaseStatus },
+  newStatus: CaseStatus,
+  actor: { actorType: ActorType; actorId?: string | null },
+  sourceChannel: string,
+) {
+  await tx.negotiationCase.update({ where: { id: negotiationCase.id }, data: { status: newStatus } })
+
+  await recordAudit(tx, {
+    actorType: actor.actorType,
+    actorId: actor.actorId,
+    caseId: negotiationCase.id,
+    action: "STATUS_CHANGED",
+    before: { status: negotiationCase.status },
+    after: { status: newStatus },
+    sourceChannel,
+  })
+
+  let shouldSendClosureSummary = false
+
+  if (isTerminal(newStatus)) {
+    const ticket = await tx.negotiationTicket.findUnique({ where: { negotiationCaseId: negotiationCase.id } })
+    if (ticket) {
+      await revokeTicketTokens(tx, ticket.id, negotiationCase.id)
+      if (!ticket.closureSummarySentAt) {
+        await tx.negotiationTicket.update({
+          where: { id: ticket.id },
+          data: { status: "CLOSED", closedAt: new Date(), closureSummarySentAt: new Date() },
+        })
+        shouldSendClosureSummary = true
+      }
+    }
+  }
+
+  return { shouldSendClosureSummary }
+}
+
+async function sendClosureSummaryEmail(caseId: string) {
+  const negotiationCase = await prisma.negotiationCase.findUniqueOrThrow({
+    where: { id: caseId },
+    include: {
+      ticket: true,
+      business: true,
+      offers: { orderBy: { createdAt: "desc" }, take: 1 },
+    },
+  })
+  if (!negotiationCase.ticket) return
+
+  const latestOffer = negotiationCase.offers[0]
+
+  await sendEmail({
+    to: negotiationCase.ticket.customerEmail,
+    template: "closure-summary",
+    data: {
+      caseRef: negotiationCase.publicRef,
+      status: negotiationCase.status,
+      offerSummary: latestOffer
+        ? {
+            finalPriceCents: latestOffer.finalPriceCents,
+            currency: latestOffer.currency,
+            includedGoods: latestOffer.includedGoods,
+            businessName: negotiationCase.business?.name,
+          }
+        : null,
+      supportEmail: process.env.SUPPORT_EMAIL ?? "support@example.com",
+    },
+  })
+}
+
+export type CreateCaseInput = {
+  email: string
+  categoryId: string
+  description: string
+  url?: string
+  targetPriceCents?: number
+  maxBudgetCents?: number
+  currency?: string
+  quantity?: number
+  desiredDate?: Date
+  location?: string
+  notes?: string
+  categoryFieldValues?: Record<string, unknown>
+}
+
+export async function createCase(input: CreateCaseInput) {
+  const startingCount = await prisma.negotiationCase.count()
+
+  const { negotiationCase, ticket, rawToken } = await prisma.$transaction(async (tx) => {
+    let negotiationCase: Awaited<ReturnType<typeof tx.negotiationCase.create>> | undefined
+    let lastError: unknown
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        negotiationCase = await tx.negotiationCase.create({
+          data: {
+            publicRef: generatePublicRef(startingCount + 1 + attempt),
+            status: "SUBMITTED",
+            categoryId: input.categoryId,
+            description: input.description,
+            url: input.url,
+            targetPriceCents: input.targetPriceCents,
+            maxBudgetCents: input.maxBudgetCents,
+            currency: input.currency ?? "USD",
+            quantity: input.quantity,
+            desiredDate: input.desiredDate,
+            location: input.location,
+            notes: input.notes,
+            categoryFieldValues: input.categoryFieldValues as Prisma.InputJsonValue | undefined,
+          },
+        })
+        break
+      } catch (error) {
+        lastError = error
+      }
+    }
+    if (!negotiationCase) throw lastError ?? new Error("Failed to create case")
+
+    await recordAudit(tx, {
+      actorType: "CUSTOMER",
+      caseId: negotiationCase.id,
+      action: "CASE_CREATED",
+      after: { status: negotiationCase.status },
+      sourceChannel: "web",
+    })
+
+    const ticket = await tx.negotiationTicket.create({
+      data: { negotiationCaseId: negotiationCase.id, customerEmail: input.email },
+    })
+
+    const { raw } = await issueAccessToken(tx, ticket.id, negotiationCase.id)
+
+    return { negotiationCase, ticket, rawToken: raw }
+  })
+
+  await sendEmail({
+    to: ticket.customerEmail,
+    template: "ticket-confirmation",
+    data: {
+      caseRef: negotiationCase.publicRef,
+      magicLinkUrl: buildCaseUrl(rawToken),
+      description: negotiationCase.description,
+    },
+  })
+
+  return { negotiationCase, ticket }
+}
+
+export async function assignNegotiator(caseId: string, negotiatorId: string) {
+  const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+  const nextStatus: CaseStatus =
+    existing.status === "SUBMITTED" || existing.status === "UNDER_REVIEW" ? "ASSIGNED" : existing.status
+
+  await prisma.$transaction(async (tx) => {
+    await tx.negotiationCase.update({
+      where: { id: caseId },
+      data: { assignedNegotiatorId: negotiatorId, status: nextStatus },
+    })
+    await recordAudit(tx, {
+      actorType: "NEGOTIATOR",
+      actorId: negotiatorId,
+      caseId,
+      action: "CASE_ASSIGNED",
+      before: { assignedNegotiatorId: existing.assignedNegotiatorId, status: existing.status },
+      after: { assignedNegotiatorId: negotiatorId, status: nextStatus },
+      sourceChannel: "internal",
+    })
+  })
+
+  return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+}
+
+export async function setCaseStatus(caseId: string, newStatus: CaseStatus, negotiatorId: string) {
+  const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+
+  const { shouldSendClosureSummary } = await prisma.$transaction((tx) =>
+    applyStatusChangeInTx(tx, existing, newStatus, { actorType: "NEGOTIATOR", actorId: negotiatorId }, "internal"),
+  )
+
+  if (shouldSendClosureSummary) {
+    await sendClosureSummaryEmail(caseId)
+  }
+
+  return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+}
+
+export type CustomerDecision = "ACCEPTED" | "DECLINED" | "REQUESTED_ANOTHER_ROUND"
+
+export async function recordCustomerDecision(caseId: string, offerId: string, decision: CustomerDecision) {
+  const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+  const offer = await prisma.offer.findUniqueOrThrow({ where: { id: offerId } })
+
+  if (isTerminal(existing.status)) {
+    throw new Error("This case is already closed.")
+  }
+
+  const newCaseStatus: CaseStatus =
+    decision === "ACCEPTED" ? "ACCEPTED" : decision === "DECLINED" ? "DECLINED" : "NEGOTIATING"
+  const offerStatus = decision === "ACCEPTED" ? "ACCEPTED" : decision === "DECLINED" ? "DECLINED" : "SUPERSEDED"
+
+  const { shouldSendClosureSummary } = await prisma.$transaction(async (tx) => {
+    await tx.offer.update({
+      where: { id: offerId },
+      data: { customerDecision: decision, decidedAt: new Date(), status: offerStatus },
+    })
+    await recordAudit(tx, {
+      actorType: "CUSTOMER",
+      caseId,
+      action: "OFFER_UPDATED",
+      relatedEntityType: "Offer",
+      relatedEntityId: offerId,
+      before: { customerDecision: offer.customerDecision, status: offer.status },
+      after: { customerDecision: decision, status: offerStatus },
+      sourceChannel: "web",
+    })
+    return applyStatusChangeInTx(tx, existing, newCaseStatus, { actorType: "CUSTOMER" }, "web")
+  })
+
+  if (shouldSendClosureSummary) {
+    await sendClosureSummaryEmail(caseId)
+  }
+
+  return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+}

@@ -1,58 +1,100 @@
-# The Negotiator — Claude Code Project Context
+# The Negotiator — CLAUDE.md
+## Full-System Build Context for Claude Code
 
-This file orients Claude Code (or any engineering agent) working in this repository. It is not a replacement for the foundation docs in `/docs` — it's the map to them.
+This file orients an engineering agent building **the entire Negotiator platform** — not just the hero landing prototype in this repo's `src/`. Read this first, then pull the specific docs referenced per phase below as you work.
 
-## What this repo is
+## What "the entire system" means
 
-This repo currently contains the **hero landing page prototype** (`src/`, bundled via `bundle-artifact.sh`) for The Negotiator, plus the **full foundation documentation set** (`/docs`) that governs product, brand, operations, and engineering decisions for the platform.
+Per `docs/00_MASTER_INDEX.md` and `docs/15_LAUNCH_ROADMAP.md`, the full system is four connected surfaces plus the operating layer behind them:
 
-## Read this first
+1. **Customer Portal** — request submission, ticket/magic-link tracking, offer review, decision, deal history
+2. **Negotiator Portal** — case workspace for human Negotiators (this is a human-powered platform — see Non-Negotiable #2 below)
+3. **Business Portal** — request inbox, offer/counteroffer submission for partner businesses
+4. **Admin Portal** — users, categories, businesses, agreements, cases, payments, disputes, audit (the Category & Business CMS lives here)
 
-Before making product, copy, or architecture decisions, read:
-- `docs/00_MASTER_INDEX.md` — map of all 22 foundation docs and the source-of-truth priority order when documents conflict
-- `docs/01_BUSINESS_BIBLE.md` — what The Negotiator is/is not, core promise, trust principles
-- `docs/10_BRAND_BIBLE.md` — voice, tone, visual direction, trust language rules
-- `docs/20_ENGINEERING_BIBLE.md` — engineering principles and standards for this codebase
+Do not build these as independent apps with duplicated logic. `docs/08_PLATFORM_ARCHITECTURE.md` defines one shared domain model (`NegotiationCase`, `Offer`, `Business`, `Category`, etc.) that all four portals read/write through role-scoped APIs.
 
-## Non-negotiable rules for anything shipped from this repo
+## Non-negotiable rules (apply to every surface, every phase)
 
-These come directly from the foundation docs and apply to every UI string, mock, and piece of content generated here — not just backend logic:
+1. **Never state or imply a guaranteed or specific savings/outcome** in any copy, mock data, or placeholder content unless it's a real, substantiated result. `docs/01_BUSINESS_BIBLE.md` §14, `docs/10_BRAND_BIBLE.md` §16.
+2. **Human-powered only.** No autonomous/AI-driven negotiation logic, anywhere, in the initial build. `docs/00_MASTER_INDEX.md` (Human-First Constraint), `docs/15_LAUNCH_ROADMAP.md` Phase 6.
+3. **Internal commercial data never reaches customer-facing code paths** — partner pricing, margins, negotiation strategy, unpublished categories/businesses. Enforce via explicit DTOs, not field filtering after the fact. `docs/08_PLATFORM_ARCHITECTURE.md` §5.
+4. **Customer identity is ticket-based, not account-based.** Magic-link, single-case-scoped, revoked at terminal status. No password-first customer flows. `docs/02_PRODUCT_REQUIREMENTS.md` §6a, `docs/03_CUSTOMER_JOURNEY.md` §3/§10.
+5. **Post-closure record access is never self-service.** Always routes through Support with identity + approval verification logged. `docs/03_CUSTOMER_JOURNEY.md` §10.1, `docs/07_OPERATIONS_AND_ORG.md` §6.1.
+6. **A `TBD` in `docs/21_OPEN_DECISIONS.md` is not a decision.** Surface it back to the user rather than resolving it silently in code.
+7. **Category and business creation is admin-mediated only** — no self-service creation by businesses themselves in this scope. `docs/22_CATEGORY_AND_BUSINESS_CMS.md` §3.
 
-1. **Never state or imply a guaranteed or specific savings/outcome** (e.g., a percentage off, a dollar amount, "secured") unless it is a real, substantiated result tied to an actual case. This applies to marketing copy, placeholder/mock UI content, and example data alike. See `docs/01_BUSINESS_BIBLE.md` §14 (Non-Negotiable Trust Principles) and `docs/10_BRAND_BIBLE.md` §16 (Trust Language).
-2. **The initial platform is human-operated.** Do not build, imply, or mock autonomous/AI-driven negotiation. See `docs/00_MASTER_INDEX.md` (Human-First Constraint) and `docs/15_LAUNCH_ROADMAP.md` (Phase 6 note).
-3. **Never expose internal commercial data** (partner pricing, margins, negotiation strategy, unpublished categories/businesses) through any customer-facing surface, including prototypes. See `docs/08_PLATFORM_ARCHITECTURE.md` §5 (Data Separation).
-4. **Customer access is ticket-based, not account-based.** No password-first flows for customers; magic-link access scoped to a single case, revoked at case closure. See `docs/02_PRODUCT_REQUIREMENTS.md` §6a and `docs/03_CUSTOMER_JOURNEY.md` §3/§10.
-5. **A `TBD` in `docs/21_OPEN_DECISIONS.md` is not a green light.** Treat it as unresolved; flag it back to the user rather than silently deciding it in code or copy.
+## Doc map by build concern
 
-## Brand quick-reference (see `docs/10_BRAND_BIBLE.md` for full detail)
+| You're building... | Read these first |
+|---|---|
+| Anything — orientation | `00_MASTER_INDEX.md`, `01_BUSINESS_BIBLE.md` |
+| Data model / API / entities | `08_PLATFORM_ARCHITECTURE.md`, `19_INTERNAL_DATA_DICTIONARY.md` |
+| Customer request flow, tracking, dashboard | `03_CUSTOMER_JOURNEY.md`, `02_PRODUCT_REQUIREMENTS.md` §3, §6a, §7 |
+| Negotiator case workspace | `04_NEGOTIATION_OPERATING_SYSTEM.md`, `02_PRODUCT_REQUIREMENTS.md` §4 |
+| Business portal, offers/counteroffers | `05_BUSINESS_PARTNER_SYSTEM.md`, `06_PARTNER_AGREEMENT_FRAMEWORK.md`, `02_PRODUCT_REQUIREMENTS.md` §5 |
+| Admin portal, Category & Business CMS | `09_ADMIN_BUSINESS_CUSTOMER_PORTALS.md`, `22_CATEGORY_AND_BUSINESS_CMS.md` |
+| Any UI screen, component, or copy | `11_UX_UI_SYSTEM.md`, `10_BRAND_BIBLE.md` |
+| Roles, permissions, staffing, SOPs | `07_OPERATIONS_AND_ORG.md`, `20_ENGINEERING_BIBLE.md` §5 |
+| Payments, fees, unit economics | `12_REVENUE_AND_UNIT_ECONOMICS.md` |
+| Security, fraud, disputes, verification | `13_TRUST_RISK_COMPLIANCE.md` |
+| Analytics/KPIs | `16_MEASUREMENT_ANALYTICS.md` |
+| Terms, consent, legal-adjacent copy | `18_CUSTOMER_TERMS_FRAMEWORK.md` (flag for legal review, don't ship as final) |
+| Engineering standards, stack, auth, audit | `20_ENGINEERING_BIBLE.md` |
+| Anything marked unresolved | `21_OPEN_DECISIONS.md` — check before assuming |
+
+Source-of-truth priority when docs conflict (`00_MASTER_INDEX.md`): approved business decisions → product requirements → operating procedures → brand/UX → technical implementation.
+
+## Recommended build order
+
+Following `docs/15_LAUNCH_ROADMAP.md`:
+
+**Phase 1 — Concierge MVP** (manual-heavy, prove the model)
+- Customer: simple request form + status page (no full portal yet)
+- Internal: case list, negotiator assignment, negotiation records — can be spreadsheet/admin-tool-level, not a full app
+- Category/business setup can be manual (spreadsheet or direct DB entry) — CMS isn't required yet (`22_CATEGORY_AND_BUSINESS_CMS.md` §10)
+
+**Phase 2 — Platform MVP** (this is where most of the doc set applies)
+- Customer Portal (full, per `02_PRODUCT_REQUIREMENTS.md` §3 + §6a)
+- Negotiator Portal (`02` §4)
+- Business Portal (`02` §5)
+- Admin Portal including Category & Business CMS (`02` §6, `09`, `22`)
+- Notifications, offer system, audit system, basic analytics
+
+**Phase 3 — Transaction Infrastructure**
+- Payments, deal confirmation, receipts, refunds, partner settlement
+
+**Phase 4+ — Network Expansion / Integrations / Automation**
+- Only after gate criteria in `15_LAUNCH_ROADMAP.md` are met — do not build ahead of validated demand
+
+Do not skip ahead to Phase 3+ features (payments, integrations) before the Phase 2 core loop (request → assign → negotiate → offer → decide → close) works end to end with the ticket-based access model.
+
+## Core entities to model first
+
+From `08_PLATFORM_ARCHITECTURE.md` §4: `User`, `CustomerProfile`, `Business`, `Category`, `CategoryField`, `BusinessCategory`, `PartnerAgreement`, `Negotiator`, `NegotiationCase`, `Message`, `Offer`, `CustomerAuthorization`, plus the ticket-access entities `NegotiationTicket`, `AccessToken`, `CustomerAccount` (§4.3), and `AuditLog`. Get the case status lifecycle right first (`02_PRODUCT_REQUIREMENTS.md` §7) — nearly everything else hangs off it.
+
+## Brand quick-reference
 
 - Promise: **"You ask. We negotiate."**
-- Primary CTA: **"Negotiate This For Me"**
-- Palette (current working default, Option 2 / Bright Corporate direction): Cobalt `#123FA9`, Amber `#F5A623`, Cream `#F7F5F0`
+- Primary CTA copy: **"Negotiate This For Me"**
+- Palette (working default, Option 2/Bright Corporate): Cobalt `#123FA9`, Amber `#F5A623`, Cream `#F7F5F0`
 - Typography: Liberation Sans (primary), Lora (secondary/editorial)
-- Mark: the "o" in Negotiator as a small inspector character — handlebar mustache in amber, compact fedora — see `docs/10_BRAND_BIBLE.md` and current mark implementation in `src/NegotiatorMark.tsx`
+- Mark: mustache-and-hat "o" character — see `src/NegotiatorMark.tsx` in this repo for a working implementation
 
-## This prototype's current state
+## This repo's current state vs. the full system
 
-- `src/App.tsx` — hero landing page: split layout, mustache-and-hat mark, two-tier CTA, value badges (Lower Price / Better Terms / Added Value), decorative squiggle motifs (cobalt loops, replacing an earlier full-page spinning-spiral concept that was nulled by the user)
-- `src/NegotiatorMark.tsx` — reusable SVG component for the character mark
-- Floating "status" card is intentionally **process-focused, not outcome-promising** (rule #1 above) — do not reintroduce specific savings figures into hero/marketing surfaces without an explicit, substantiated basis
-
-## Open design/product decisions relevant to future work here
-
-Pulled from `docs/21_OPEN_DECISIONS.md` — do not treat these as settled:
-- Final logo, colors, fonts, tagline, domain
-- Whether the optional persistent customer account is offered at submission, closure, or later
-- Magic-link token lifetime, single-use vs. reusable, resend rate limits
-- Exact MVP feature set, messaging channels, verification levels
+This repo currently contains **only the hero landing page prototype** (`src/App.tsx`, `src/NegotiatorMark.tsx`). It is not the platform itself — treat it as one visual reference point for the Customer Portal's entry screen, not as an architectural starting point. When building the real Customer Portal, follow `08_PLATFORM_ARCHITECTURE.md`'s suggested stack (Next.js/React/TypeScript/Tailwind frontend, NestJS/PostgreSQL/Prisma backend), not the Vite+Parcel artifact-bundling setup used for this prototype.
 
 ## When in doubt
 
-Priority order for resolving conflicts (from `docs/00_MASTER_INDEX.md`):
-1. Approved business decisions
-2. Product requirements
-3. Operating procedures
-4. Brand and UX
-5. Technical implementation
+Surface the gap explicitly — cite the relevant doc and section, and if it's genuinely unresolved, point to `21_OPEN_DECISIONS.md` rather than deciding it yourself.
 
-If a task requires a decision not covered by the docs, surface it explicitly rather than assuming — consistent with how `21_OPEN_DECISIONS.md` is meant to be used.
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
