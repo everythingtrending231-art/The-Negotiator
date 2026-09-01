@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -10,25 +11,23 @@ export default function OfferActions({ caseId, offerId }: { caseId: string; offe
   const [showNote, setShowNote] = useState(false)
   const [note, setNote] = useState("")
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   async function confirm() {
     setBusy(true)
-    setError(null)
     const res = await fetch(`/api/business/cases/${caseId}/offer/${offerId}/confirm`, { method: "POST" })
     setBusy(false)
     if (!res.ok) {
       const body = await res.json().catch(() => null)
-      setError(body?.error ?? "Couldn't confirm this offer.")
+      toast.error(body?.error ?? "Couldn't confirm this offer.")
       return
     }
+    toast.success("Offer confirmed — the customer can now see it.")
     router.refresh()
   }
 
   async function requestChanges() {
     if (!note.trim()) return
     setBusy(true)
-    setError(null)
     const res = await fetch(`/api/business/cases/${caseId}/offer/${offerId}/request-changes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -37,11 +36,12 @@ export default function OfferActions({ caseId, offerId }: { caseId: string; offe
     setBusy(false)
     if (!res.ok) {
       const body = await res.json().catch(() => null)
-      setError(body?.error ?? "Couldn't send that.")
+      toast.error(body?.error ?? "Couldn't send that.")
       return
     }
     setNote("")
     setShowNote(false)
+    toast.success("Sent to your Negotiator.")
     router.refresh()
   }
 
@@ -68,7 +68,6 @@ export default function OfferActions({ caseId, offerId }: { caseId: string; offe
           </Button>
         </div>
       )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   )
 }

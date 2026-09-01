@@ -3,8 +3,10 @@ import { prisma } from "@/server/db"
 import { requireRole, getActingBusinessContact } from "@/server/auth/require-session"
 import OfferActions from "@/app/business/cases/[id]/offer-actions"
 import InviteActions from "@/app/business/cases/[id]/invite-actions"
-import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
+import StatusBadge from "@/components/status-badge"
 import { formatCents } from "@/lib/money"
+import { cn } from "@/lib/utils"
 
 export default async function BusinessCaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -52,90 +54,86 @@ export default async function BusinessCaseDetailPage({ params }: { params: Promi
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#F5A623" }}>
-            {negotiationCase.publicRef}
-          </p>
-          <h1 className="text-2xl font-black" style={{ color: "#123FA9" }}>
-            {negotiationCase.category.name}
-          </h1>
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-600">{negotiationCase.publicRef}</p>
+          <h1 className="text-2xl font-black text-cobalt-600">{negotiationCase.category.name}</h1>
         </div>
-        <Badge>{negotiationCase.status}</Badge>
+        <StatusBadge status={negotiationCase.status} />
       </div>
 
-      <div className="bg-white rounded-xl shadow p-6 space-y-2">
-        <p className="text-sm text-slate-500">Customer requirements</p>
+      <Card className="p-6 space-y-2">
+        <p className="text-sm text-ink-muted">Customer requirements</p>
         <p>{negotiationCase.description}</p>
-        <div className="text-sm text-slate-600 grid grid-cols-2 gap-1 pt-2">
+        <div className="text-sm text-ink-soft grid grid-cols-2 gap-1 pt-2">
           {negotiationCase.quantity != null && <p>Quantity: {negotiationCase.quantity}</p>}
           {negotiationCase.location && <p>Location: {negotiationCase.location}</p>}
           {negotiationCase.desiredDate && (
             <p>Desired date: {new Date(negotiationCase.desiredDate).toLocaleDateString()}</p>
           )}
         </div>
-      </div>
+      </Card>
 
+      {/* "Action needed" states get an amber accent so they read as
+          distinct from passive "waiting on someone else" states. */}
       {isMyCase && latestOffer && (
-        <div className="bg-white rounded-xl shadow p-6 space-y-3">
-          <h2 className="font-bold" style={{ color: "#123FA9" }}>
+        <Card className={cn("p-6 space-y-3", !latestOffer.businessConfirmedAt && "border-l-4 border-l-amber-500")}>
+          <h2 className="font-bold text-cobalt-600">
             {latestOffer.businessConfirmedAt ? "Confirmed offer" : "Draft offer from your Negotiator"}
           </h2>
           <p className="text-2xl font-black">{formatCents(latestOffer.finalPriceCents, latestOffer.currency)}</p>
-          <p className="text-slate-700">{latestOffer.includedGoods}</p>
-          {latestOffer.additionalBenefits && <p className="text-sm text-slate-600">{latestOffer.additionalBenefits}</p>}
-          {latestOffer.conditions && <p className="text-sm text-slate-500">Conditions: {latestOffer.conditions}</p>}
-          {latestOffer.paymentTerms && <p className="text-sm text-slate-500">Payment: {latestOffer.paymentTerms}</p>}
-          {latestOffer.deliveryTerms && <p className="text-sm text-slate-500">Delivery: {latestOffer.deliveryTerms}</p>}
+          <p className="text-ink-soft">{latestOffer.includedGoods}</p>
+          {latestOffer.additionalBenefits && <p className="text-sm text-ink-muted">{latestOffer.additionalBenefits}</p>}
+          {latestOffer.conditions && <p className="text-sm text-ink-muted">Conditions: {latestOffer.conditions}</p>}
+          {latestOffer.paymentTerms && <p className="text-sm text-ink-muted">Payment: {latestOffer.paymentTerms}</p>}
+          {latestOffer.deliveryTerms && <p className="text-sm text-ink-muted">Delivery: {latestOffer.deliveryTerms}</p>}
 
           {latestOffer.businessConfirmedAt ? (
-            <p className="text-sm font-bold text-slate-500">
+            <p className="text-sm font-bold text-ink-muted">
               Confirmed by {latestOffer.businessContact?.name ?? "you"} on{" "}
               {new Date(latestOffer.businessConfirmedAt).toLocaleString()}
             </p>
           ) : (
             <OfferActions caseId={negotiationCase.id} offerId={latestOffer.id} />
           )}
-        </div>
+        </Card>
       )}
 
       {isMyCase && !latestOffer && (
-        <div className="bg-white rounded-xl shadow p-6">
-          <p className="text-sm text-slate-500">
+        <Card className="p-6">
+          <p className="text-sm text-ink-muted">
             No offer drafted yet — your Negotiator will reach out to discuss terms.
           </p>
-        </div>
+        </Card>
       )}
 
       {!isMyCase && myInvite?.status === "PENDING" && (
-        <div className="bg-white rounded-xl shadow p-6 space-y-3">
-          <h2 className="font-bold" style={{ color: "#123FA9" }}>
-            Interested in this request?
-          </h2>
-          <p className="text-sm text-slate-500">
+        <Card className="p-6 space-y-3 border-l-4 border-l-amber-500">
+          <h2 className="font-bold text-cobalt-600">Interested in this request?</h2>
+          <p className="text-sm text-ink-muted">
             Your Negotiator wants to know if you can fulfill this before discussing terms.
           </p>
           <InviteActions caseId={negotiationCase.id} inviteId={myInvite.id} />
-        </div>
+        </Card>
       )}
 
       {!isMyCase && myInvite?.status === "DECLINED" && (
-        <div className="bg-white rounded-xl shadow p-6">
-          <p className="text-sm text-slate-500">You declined this request.</p>
-          {myInvite.responseNote && <p className="text-sm text-slate-400 mt-1">&ldquo;{myInvite.responseNote}&rdquo;</p>}
-        </div>
+        <Card className="p-6">
+          <p className="text-sm text-ink-muted">You declined this request.</p>
+          {myInvite.responseNote && <p className="text-sm text-ink-muted mt-1">&ldquo;{myInvite.responseNote}&rdquo;</p>}
+        </Card>
       )}
 
       {!isMyCase && myInvite?.status === "WITHDRAWN" && (
-        <div className="bg-white rounded-xl shadow p-6">
-          <p className="text-sm text-slate-500">This request went to another business.</p>
-        </div>
+        <Card className="p-6">
+          <p className="text-sm text-ink-muted">This request went to another business.</p>
+        </Card>
       )}
 
       {!isMyCase && myInvite?.status === "ACCEPTED" && (
-        <div className="bg-white rounded-xl shadow p-6">
-          <p className="text-sm text-slate-500">
+        <Card className="p-6">
+          <p className="text-sm text-ink-muted">
             You accepted this request — your Negotiator will follow up to discuss terms.
           </p>
-        </div>
+        </Card>
       )}
     </div>
   )
