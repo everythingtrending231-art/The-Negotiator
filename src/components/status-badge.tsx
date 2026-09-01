@@ -6,14 +6,18 @@ import { cn } from "@/lib/utils"
 // status the same way instead of each reimplementing its own color logic.
 export default function StatusBadge({
   status,
+  label,
   className,
 }: {
   status: string
+  // Override the rendered text while still color-coding by `status` — for
+  // callers that want to append a count or other detail (e.g. "Submitted: 3").
+  label?: string
   className?: string
 }) {
   return (
     <Badge variant={statusVariant(status)} className={cn("font-bold", className)}>
-      {statusLabel(status)}
+      {label ?? statusLabel(status)}
     </Badge>
   )
 }
