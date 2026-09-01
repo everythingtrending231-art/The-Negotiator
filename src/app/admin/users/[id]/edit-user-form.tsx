@@ -2,10 +2,12 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import type { Role } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Card } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 type UserRow = { id: string; name: string; email: string; role: Role; active: boolean }
@@ -18,13 +20,9 @@ export default function EditUserForm({ actorRole, user }: { actorRole: Role; use
   const [active, setActive] = useState(user.active)
   const [newPassword, setNewPassword] = useState("")
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
 
   async function save() {
     setBusy(true)
-    setError(null)
-    setNotice(null)
     const res = await fetch(`/api/admin/users/${user.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -33,20 +31,19 @@ export default function EditUserForm({ actorRole, user }: { actorRole: Role; use
     setBusy(false)
     if (!res.ok) {
       const body = await res.json().catch(() => null)
-      setError(body?.error ?? "Couldn't update the user.")
+      toast.error(body?.error ?? "Couldn't update the user.")
       return
     }
+    toast.success("User updated.")
     router.refresh()
   }
 
   async function resetPassword() {
     if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters.")
+      toast.error("Password must be at least 8 characters.")
       return
     }
     setBusy(true)
-    setError(null)
-    setNotice(null)
     const res = await fetch(`/api/admin/users/${user.id}/password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -55,21 +52,19 @@ export default function EditUserForm({ actorRole, user }: { actorRole: Role; use
     setBusy(false)
     if (!res.ok) {
       const body = await res.json().catch(() => null)
-      setError(body?.error ?? "Couldn't reset the password.")
+      toast.error(body?.error ?? "Couldn't reset the password.")
       return
     }
     setNewPassword("")
-    setNotice("Password reset.")
+    toast.success("Password reset.")
   }
 
   return (
     <div className="max-w-md mx-auto px-4 py-10 space-y-6">
-      <h1 className="text-2xl font-black" style={{ color: "#123FA9" }}>
-        {user.name}
-      </h1>
-      <p className="text-sm text-slate-500">{user.email}</p>
+      <h1 className="text-2xl font-black text-cobalt-600">{user.name}</h1>
+      <p className="text-sm text-ink-muted">{user.email}</p>
 
-      <div className="bg-white rounded-xl shadow p-6 space-y-4">
+      <Card className="p-6 space-y-4">
         <div className="space-y-2">
           <Label>Role</Label>
           <Select value={role} onValueChange={(v) => setRole(v as Role)}>
@@ -91,14 +86,12 @@ export default function EditUserForm({ actorRole, user }: { actorRole: Role; use
             {active ? "Active" : "Inactive"}
           </Button>
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {notice && <p className="text-sm text-green-700">{notice}</p>}
         <Button disabled={busy} onClick={save}>
           Save
         </Button>
-      </div>
+      </Card>
 
-      <div className="bg-white rounded-xl shadow p-6 space-y-4">
+      <Card className="p-6 space-y-4">
         <Label htmlFor="new-password">Reset password</Label>
         <Input
           id="new-password"
@@ -110,7 +103,7 @@ export default function EditUserForm({ actorRole, user }: { actorRole: Role; use
         <Button size="sm" variant="outline" disabled={busy} onClick={resetPassword}>
           Reset password
         </Button>
-      </div>
+      </Card>
     </div>
   )
 }

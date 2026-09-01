@@ -6,6 +6,7 @@ import type { Role } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Card } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function NewUserForm({ actorRole }: { actorRole: Role }) {
@@ -44,10 +45,9 @@ export default function NewUserForm({ actorRole }: { actorRole: Role }) {
 
   return (
     <div className="max-w-md mx-auto px-4 py-10">
-      <h1 className="text-2xl font-black mb-6" style={{ color: "#123FA9" }}>
-        New user
-      </h1>
-      <form onSubmit={onSubmit} className="bg-white rounded-xl shadow p-6 space-y-4">
+      <h1 className="text-2xl font-black mb-6 text-cobalt-600">New user</h1>
+      <Card className="p-6">
+      <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>
           <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -87,6 +87,7 @@ export default function NewUserForm({ actorRole }: { actorRole: Role }) {
           {submitting ? "Creating…" : "Create user"}
         </Button>
       </form>
+      </Card>
     </div>
   )
 }
