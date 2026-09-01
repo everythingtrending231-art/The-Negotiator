@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { AnimatePresence, motion } from "framer-motion"
 import { ChevronDown } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -93,25 +94,63 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
 
   if (submitted) {
     return (
-      <div className="bg-white rounded-panel shadow-panel p-10 text-center animate-scale-in">
-        <div className="mx-auto mb-6 flex items-center justify-center">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 260, damping: 22 }}
+        className="bg-white rounded-panel shadow-panel p-10 text-center"
+      >
+        <motion.div
+          initial={{ scale: 0, rotate: -20 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 18, delay: 0.15 }}
+          className="mx-auto mb-6 flex items-center justify-center"
+        >
           <NegotiatorMark size={72} />
-        </div>
-        <p className="text-xs font-bold uppercase tracking-wide mb-2 text-amber-600">Request sent</p>
-        <h2 className="font-black text-display-sm text-cobalt-600 mb-3">Check your email</h2>
-        <p className="text-ink-soft max-w-sm mx-auto mb-8">
+        </motion.div>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="text-xs font-bold uppercase tracking-wide mb-2 text-amber-600"
+        >
+          Request sent
+        </motion.p>
+        <motion.h2
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="font-black text-display-sm text-cobalt-600 mb-3"
+        >
+          Check your email
+        </motion.h2>
+        <motion.p
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.42 }}
+          className="text-ink-soft max-w-sm mx-auto mb-8"
+        >
           Your negotiation ticket is <strong className="text-ink">{submitted}</strong>. We&apos;ve emailed you a
           link to track it — no password, no account, just click through whenever you want an update.
-        </p>
+        </motion.p>
 
-        <div className="text-left max-w-xs mx-auto space-y-3 border-t border-cobalt-100 pt-6">
+        <motion.div
+          initial="hidden"
+          animate="show"
+          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.55 } } }}
+          className="text-left max-w-xs mx-auto space-y-3 border-t border-cobalt-100 pt-6"
+        >
           {[
             { label: "Received", done: true },
             { label: "Your Negotiator is assigned", done: false },
             { label: "We negotiate on your behalf", done: false },
             { label: "You review the offer", done: false },
           ].map((step, i) => (
-            <div key={step.label} className="flex items-center gap-3">
+            <motion.div
+              key={step.label}
+              variants={{ hidden: { opacity: 0, x: -10 }, show: { opacity: 1, x: 0 } }}
+              className="flex items-center gap-3"
+            >
               <span
                 className={
                   "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold " +
@@ -123,19 +162,21 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
               <span className={"text-sm " + (step.done ? "font-bold text-ink" : "text-ink-muted")}>
                 {step.label}
               </span>
-            </div>
+            </motion.div>
           ))}
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     )
   }
 
   return (
     <Form {...form}>
-      <form
+      <motion.form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="bg-white rounded-panel shadow-panel p-6 sm:p-9 space-y-7 animate-fade-up"
-        style={{ animationDelay: "120ms" }}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+        className="bg-white rounded-panel shadow-panel p-6 sm:p-9 space-y-7"
       >
         <div className="space-y-5">
           <p className="text-xs font-bold uppercase tracking-wide text-amber-600">Required</p>
@@ -195,26 +236,43 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
             )}
           />
 
-          {selectedCategory && selectedCategory.fields.length > 0 && (
-            <div className="space-y-4 border-t border-dashed border-border pt-5">
-              <p className="text-sm font-bold text-ink-muted">{selectedCategory.name} details</p>
-              {selectedCategory.fields.map((field) => (
-                <div key={field.id} className="space-y-2">
-                  <Label htmlFor={`cf-${field.id}`}>
-                    {field.fieldName}
-                    {field.required ? " *" : ""}
-                  </Label>
-                  <Input
-                    id={`cf-${field.id}`}
-                    value={categoryFieldValues[field.id] ?? ""}
-                    onChange={(event) =>
-                      setCategoryFieldValues((prev) => ({ ...prev, [field.id]: event.target.value }))
-                    }
-                  />
+          <AnimatePresence initial={false}>
+            {selectedCategory && selectedCategory.fields.length > 0 && (
+              <motion.div
+                key={selectedCategory.id}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-4 border-t border-dashed border-border pt-5">
+                  <p className="text-sm font-bold text-ink-muted">{selectedCategory.name} details</p>
+                  {selectedCategory.fields.map((field, i) => (
+                    <motion.div
+                      key={field.id}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.05 * i, duration: 0.25 }}
+                      className="space-y-2"
+                    >
+                      <Label htmlFor={`cf-${field.id}`}>
+                        {field.fieldName}
+                        {field.required ? " *" : ""}
+                      </Label>
+                      <Input
+                        id={`cf-${field.id}`}
+                        value={categoryFieldValues[field.id] ?? ""}
+                        onChange={(event) =>
+                          setCategoryFieldValues((prev) => ({ ...prev, [field.id]: event.target.value }))
+                        }
+                      />
+                    </motion.div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Everything below is optional — collapsed by default so the form
@@ -229,9 +287,9 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
               <span className="text-sm font-bold text-cobalt-600">
                 Add more detail <span className="font-normal text-ink-muted">(optional, helps your Negotiator)</span>
               </span>
-              <ChevronDown
-                className={"h-4 w-4 text-cobalt-600 transition-transform duration-200 " + (detailsOpen ? "rotate-180" : "")}
-              />
+              <motion.span animate={{ rotate: detailsOpen ? 180 : 0 }} transition={{ type: "spring", stiffness: 300, damping: 20 }}>
+                <ChevronDown className="h-4 w-4 text-cobalt-600" />
+              </motion.span>
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="pt-5 space-y-5">
@@ -332,12 +390,32 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
           </CollapsibleContent>
         </Collapsible>
 
-        {serverError && <p className="text-sm text-destructive">{serverError}</p>}
+        {serverError && (
+          <motion.p
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-sm text-destructive"
+          >
+            {serverError}
+          </motion.p>
+        )}
 
-        <Button type="submit" size="lg" disabled={form.formState.isSubmitting} className="w-full">
-          {form.formState.isSubmitting ? "Sending…" : "Negotiate This For Me"}
-        </Button>
-      </form>
+        <motion.div whileHover={{ scale: 1.015 }} whileTap={{ scale: 0.98 }} transition={{ type: "spring", stiffness: 400, damping: 22 }}>
+          <Button type="submit" size="lg" disabled={form.formState.isSubmitting} className="w-full overflow-hidden">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={form.formState.isSubmitting ? "sending" : "idle"}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+              >
+                {form.formState.isSubmitting ? "Sending…" : "Negotiate This For Me"}
+              </motion.span>
+            </AnimatePresence>
+          </Button>
+        </motion.div>
+      </motion.form>
     </Form>
   )
 }
