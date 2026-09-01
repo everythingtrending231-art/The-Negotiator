@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -10,11 +11,9 @@ export default function InviteActions({ caseId, inviteId }: { caseId: string; in
   const [showDecline, setShowDecline] = useState(false)
   const [note, setNote] = useState("")
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   async function respond(decision: "ACCEPTED" | "DECLINED") {
     setBusy(true)
-    setError(null)
     const res = await fetch(`/api/business/cases/${caseId}/invites/${inviteId}/respond`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -23,9 +22,10 @@ export default function InviteActions({ caseId, inviteId }: { caseId: string; in
     setBusy(false)
     if (!res.ok) {
       const body = await res.json().catch(() => null)
-      setError(body?.error ?? "Couldn't send that.")
+      toast.error(body?.error ?? "Couldn't send that.")
       return
     }
+    toast.success(decision === "ACCEPTED" ? "Accepted — the Negotiator has been notified." : "Declined.")
     router.refresh()
   }
 
@@ -52,7 +52,6 @@ export default function InviteActions({ caseId, inviteId }: { caseId: string; in
           </Button>
         </div>
       )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   )
 }
