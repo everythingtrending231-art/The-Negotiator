@@ -104,6 +104,46 @@ export async function setUserActive(userId: string, active: boolean, actor: Acto
   })
 }
 
+// A business login is always tied to a contact that already exists on a
+// business record (created via the CMS) — unlike createUser's free-form
+// name/email/role form, this reuses the contact's own name/email.
+export async function grantBusinessContactAccess(contactId: string, password: string, actor: Actor) {
+  assertCanManageRole(actor.role, "BUSINESS")
+
+  const contact = await prisma.businessContact.findUniqueOrThrow({ where: { id: contactId } })
+  if (contact.userId) {
+    throw new Error("This contact already has portal access.")
+  }
+  if (!contact.email) {
+    throw new Error("This contact needs an email on file before granting portal access.")
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const passwordHash = await hashPassword(password)
+    const user = await tx.user.create({
+      data: {
+        name: contact.name,
+        email: contact.email!.trim().toLowerCase(),
+        role: "BUSINESS",
+        passwordHash,
+      },
+    })
+    await tx.businessContact.update({ where: { id: contactId }, data: { userId: user.id } })
+
+    await recordAudit(tx, {
+      actorType: "ADMIN",
+      actorId: actor.id,
+      action: "USER_CREATED",
+      relatedEntityType: "BusinessContact",
+      relatedEntityId: contactId,
+      after: { email: user.email, role: user.role },
+      sourceChannel: "internal",
+    })
+
+    return user
+  })
+}
+
 export async function setUserPassword(userId: string, newPassword: string, actor: Actor) {
   const existing = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
   assertCanManageRole(actor.role, existing.role)

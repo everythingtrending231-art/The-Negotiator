@@ -17,7 +17,7 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
       ticket: true,
       messages: { orderBy: { createdAt: "asc" }, include: { authorNegotiator: true } },
       internalNotes: { orderBy: { createdAt: "asc" }, include: { negotiator: true } },
-      offers: { orderBy: { createdAt: "desc" } },
+      offers: { orderBy: { createdAt: "desc" }, include: { businessContact: true } },
       auditLogs: { orderBy: { createdAt: "desc" }, take: 50 },
     },
   })
@@ -75,6 +75,9 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
         status: o.status,
         customerDecision: o.customerDecision,
         createdAt: o.createdAt.toISOString(),
+        businessConfirmedAt: o.businessConfirmedAt?.toISOString() ?? null,
+        businessContactName: o.businessContact?.name ?? null,
+        businessFeedback: o.businessFeedback,
       }))}
       auditLogs={negotiationCase.auditLogs.map((a) => ({
         id: a.id,

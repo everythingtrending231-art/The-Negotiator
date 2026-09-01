@@ -53,3 +53,13 @@ export async function getActingNegotiatorId(session: SessionUser): Promise<strin
   })
   return negotiator.id
 }
+
+export async function getActingBusinessContact(
+  session: SessionUser,
+): Promise<{ id: string; businessId: string; businessName: string }> {
+  const contact = await prisma.businessContact.findUniqueOrThrow({
+    where: { userId: session.id },
+    include: { business: true },
+  })
+  return { id: contact.id, businessId: contact.businessId, businessName: contact.business.name }
+}

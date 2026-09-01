@@ -28,7 +28,10 @@ export default async function CasePage({ params }: { params: Promise<{ token: st
   }
 
   const negotiationCase = ticket.negotiationCase
-  const latestOffer = negotiationCase.offers[0]
+  // Phase 2 Stage 2: an offer only becomes customer-visible once the
+  // business has confirmed it (status PROPOSED -> PRESENTED) — a
+  // Negotiator-drafted PROPOSED offer must never reach the customer.
+  const latestOffer = negotiationCase.offers.find((offer) => offer.status !== "PROPOSED")
 
   return (
     <CaseDashboard

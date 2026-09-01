@@ -34,7 +34,15 @@ type Business = {
   categoryIds: string[]
   relationshipOwnerName: string | null
 }
-type Contact = { id: string; name: string; role: string | null; email: string | null; phone: string | null; isPrimary: boolean }
+type Contact = {
+  id: string
+  name: string
+  role: string | null
+  email: string | null
+  phone: string | null
+  isPrimary: boolean
+  hasPortalAccess: boolean
+}
 type Note = { id: string; authorName: string; body: string; createdAt: string }
 type Agreement = { id: string; agreementType: string; effectiveDate: string } | null
 type Performance = {
@@ -68,6 +76,10 @@ export default function BusinessDetail(props: {
   const [contactName, setContactName] = useState("")
   const [contactEmail, setContactEmail] = useState("")
   const [contactPhone, setContactPhone] = useState("")
+
+  const [grantOpen, setGrantOpen] = useState<Record<string, boolean>>({})
+  const [grantPassword, setGrantPassword] = useState<Record<string, string>>({})
+  const [grantError, setGrantError] = useState<Record<string, string | undefined>>({})
 
   const [note, setNote] = useState("")
 
@@ -123,6 +135,29 @@ export default function BusinessDetail(props: {
     setContactEmail("")
     setContactPhone("")
     setBusy(false)
+    router.refresh()
+  }
+
+  async function grantAccess(contactId: string) {
+    const password = grantPassword[contactId]
+    if (!password || password.length < 8) {
+      setGrantError((prev) => ({ ...prev, [contactId]: "Password must be at least 8 characters" }))
+      return
+    }
+    setBusy(true)
+    setGrantError((prev) => ({ ...prev, [contactId]: undefined }))
+    const res = await fetch(`/api/admin/businesses/${b.id}/contacts/${contactId}/grant-access`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    })
+    setBusy(false)
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      setGrantError((prev) => ({ ...prev, [contactId]: body?.error ?? "Couldn't grant access." }))
+      return
+    }
+    setGrantOpen((prev) => ({ ...prev, [contactId]: false }))
     router.refresh()
   }
 
@@ -237,16 +272,46 @@ export default function BusinessDetail(props: {
           Contacts
         </h2>
         {props.contacts.map((c) => (
-          <div key={c.id} className="flex items-center justify-between border rounded-lg p-3">
-            <div>
-              <p className="text-sm font-bold">
-                {c.name} {c.isPrimary && <span className="text-xs text-amber-600">(primary)</span>}
-              </p>
-              <p className="text-xs text-slate-500">{[c.email, c.phone].filter(Boolean).join(" · ")}</p>
+          <div key={c.id} className="border rounded-lg p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold">
+                  {c.name} {c.isPrimary && <span className="text-xs text-amber-600">(primary)</span>}
+                </p>
+                <p className="text-xs text-slate-500">{[c.email, c.phone].filter(Boolean).join(" · ")}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {c.hasPortalAccess ? (
+                  <Badge variant="outline">Portal access</Badge>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => setGrantOpen((prev) => ({ ...prev, [c.id]: !prev[c.id] }))}
+                  >
+                    Grant portal access
+                  </Button>
+                )}
+                <Button size="sm" variant="ghost" disabled={busy} onClick={() => removeContact(c.id)}>
+                  Remove
+                </Button>
+              </div>
             </div>
-            <Button size="sm" variant="ghost" disabled={busy} onClick={() => removeContact(c.id)}>
-              Remove
-            </Button>
+            {grantOpen[c.id] && !c.hasPortalAccess && (
+              <div className="flex items-center gap-2 pt-2 border-t">
+                <Input
+                  type="password"
+                  placeholder="Set a password"
+                  value={grantPassword[c.id] ?? ""}
+                  onChange={(e) => setGrantPassword((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                />
+                <Button size="sm" disabled={busy} onClick={() => grantAccess(c.id)}>
+                  Confirm
+                </Button>
+              </div>
+            )}
+            {grantError[c.id] && <p className="text-xs text-red-600">{grantError[c.id]}</p>}
           </div>
         ))}
         <div className="grid grid-cols-3 gap-2 pt-2 border-t">

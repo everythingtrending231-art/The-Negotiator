@@ -62,6 +62,9 @@ type Offer = {
   status: string
   customerDecision: string | null
   createdAt: string
+  businessConfirmedAt: string | null
+  businessContactName: string | null
+  businessFeedback: string | null
 }
 type AuditLogRow = { id: string; action: string; actorType: string; sourceChannel: string; createdAt: string }
 type Business = { id: string; name: string }
@@ -209,18 +212,36 @@ export default function CaseDetail(props: {
             {showOfferForm ? "Cancel" : "New offer"}
           </Button>
         </div>
+        <p className="text-xs text-slate-400">
+          After negotiating terms with the business by phone, draft the offer here — the business must confirm it
+          via their portal before the customer ever sees it.
+        </p>
 
         {props.offers.length === 0 && <p className="text-sm text-slate-500">No offers yet.</p>}
         <div className="space-y-2">
           {props.offers.map((offer) => (
-            <div key={offer.id} className="border rounded-lg p-3 flex items-center justify-between">
-              <div>
-                <p className="font-bold">{formatCents(offer.finalPriceCents, offer.currency)}</p>
-                <p className="text-sm text-slate-500">{offer.includedGoods}</p>
+            <div key={offer.id} className="border rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold">{formatCents(offer.finalPriceCents, offer.currency)}</p>
+                  <p className="text-sm text-slate-500">{offer.includedGoods}</p>
+                </div>
+                <div className="text-right text-xs text-slate-400">
+                  <p>{offer.status}</p>
+                  {offer.customerDecision && <p>Customer: {offer.customerDecision}</p>}
+                </div>
               </div>
-              <div className="text-right text-xs text-slate-400">
-                <p>{offer.status}</p>
-                {offer.customerDecision && <p>Customer: {offer.customerDecision}</p>}
+              <div className="mt-2 pt-2 border-t text-xs">
+                {offer.businessConfirmedAt ? (
+                  <p className="text-emerald-700 font-bold">
+                    Confirmed by {offer.businessContactName ?? "business"} on{" "}
+                    {new Date(offer.businessConfirmedAt).toLocaleString()}
+                  </p>
+                ) : offer.businessFeedback ? (
+                  <p className="text-amber-700 font-bold">Business requested changes: {offer.businessFeedback}</p>
+                ) : (
+                  <p className="text-slate-400">Awaiting business confirmation</p>
+                )}
               </div>
             </div>
           ))}

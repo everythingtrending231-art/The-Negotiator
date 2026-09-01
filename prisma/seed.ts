@@ -8,6 +8,7 @@ const prisma = new PrismaClient()
 // everywhere), so the first Admin account has to come from somewhere.
 const ADMIN_DEV_PASSWORD = "Admin#2026"
 const NEGOTIATOR_DEV_PASSWORD = "Negotiator#2026"
+const BUSINESS_DEV_PASSWORD = "Business#2026"
 
 type FieldSeed = { fieldName: string; fieldType: string; required: boolean }
 
@@ -144,6 +145,24 @@ async function main() {
     })
   }
 
+  // Phase 2 Stage 2: grant Business Portal access to the primary contact
+  // of each seeded business, same dev-credential pattern as Admin/Negotiator.
+  const businessNames = ["Harbor View Hotel", "CityWheels Rentals"]
+  for (const name of businessNames) {
+    const contact = await prisma.businessContact.findFirst({
+      where: { business: { name }, isPrimary: true },
+    })
+    if (contact && !contact.userId && contact.email) {
+      const passwordHash = await hashPassword(BUSINESS_DEV_PASSWORD)
+      await prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: { name: contact.name, email: contact.email!, role: "BUSINESS", passwordHash },
+        })
+        await tx.businessContact.update({ where: { id: contact.id }, data: { userId: user.id } })
+      })
+    }
+  }
+
   console.log("Seed complete.")
   console.log("")
   console.log("Dev credentials (local only — never used in production):")
@@ -151,6 +170,12 @@ async function main() {
   for (const name of negotiatorNames) {
     const email = `${name.toLowerCase().replace(/\s+/g, ".")}@example.com`
     console.log(`  Negotiator: ${email} / ${NEGOTIATOR_DEV_PASSWORD}`)
+  }
+  for (const name of businessNames) {
+    const contact = await prisma.businessContact.findFirst({ where: { business: { name }, isPrimary: true } })
+    if (contact?.email) {
+      console.log(`  Business (${name}): ${contact.email} / ${BUSINESS_DEV_PASSWORD}`)
+    }
   }
 }
 

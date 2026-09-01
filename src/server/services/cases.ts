@@ -67,12 +67,14 @@ async function sendClosureSummaryEmail(caseId: string) {
     include: {
       ticket: true,
       business: true,
-      offers: { orderBy: { createdAt: "desc" }, take: 1 },
+      offers: { orderBy: { createdAt: "desc" } },
     },
   })
   if (!negotiationCase.ticket) return
 
-  const latestOffer = negotiationCase.offers[0]
+  // A Negotiator-drafted PROPOSED offer the business never confirmed must
+  // never appear in the customer's closure summary either.
+  const latestOffer = negotiationCase.offers.find((offer) => offer.status !== "PROPOSED")
 
   await sendEmail({
     to: negotiationCase.ticket.customerEmail,
@@ -215,6 +217,15 @@ export async function recordCustomerDecision(caseId: string, offerId: string, de
   const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
   const offer = await prisma.offer.findUniqueOrThrow({ where: { id: offerId } })
 
+  if (offer.caseId !== caseId) {
+    throw new Error("This offer does not belong to this case.")
+  }
+  // The business must have confirmed the offer (Phase 2 Stage 2) before a
+  // customer can act on it — otherwise a forged offerId for a still-PROPOSED
+  // draft could be "accepted" straight past the confirmation gate.
+  if (offer.status !== "PRESENTED") {
+    throw new Error("This offer is not available for a decision yet.")
+  }
   if (isTerminal(existing.status)) {
     throw new Error("This case is already closed.")
   }

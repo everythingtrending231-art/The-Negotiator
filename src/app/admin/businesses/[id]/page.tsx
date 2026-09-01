@@ -48,6 +48,7 @@ export default async function AdminBusinessDetailPage({ params }: { params: Prom
         email: c.email,
         phone: c.phone,
         isPrimary: c.isPrimary,
+        hasPortalAccess: c.userId !== null,
       }))}
       notes={business.notes.map((n) => ({
         id: n.id,

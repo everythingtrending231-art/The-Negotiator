@@ -17,10 +17,12 @@ export type CreateOfferInput = {
   deliveryTerms?: string
 }
 
-// Creating an offer *is* presenting it in Phase 1 — there's no separate
-// "send offer" step in this pass's scope, so status jumps straight to
-// PRESENTED / case OFFER_READY (implementation default, see plan
-// assumption 9 — the docs give the status list, not transition rules).
+// Phase 2 Stage 2: the Negotiator drafts every offer after negotiating
+// with the business by phone — creating an offer is NOT presenting it.
+// It starts PROPOSED (drafted, awaiting business confirmation) and the
+// case moves to AWAITING_BUSINESS, not OFFER_READY. The business must
+// confirm it via the Business Portal (confirmOffer, below) before the
+// case becomes customer-visible.
 export async function createOffer(input: CreateOfferInput) {
   const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: input.caseId } })
 
@@ -39,7 +41,7 @@ export async function createOffer(input: CreateOfferInput) {
         validUntil: input.validUntil,
         paymentTerms: input.paymentTerms,
         deliveryTerms: input.deliveryTerms,
-        status: "PRESENTED",
+        status: "PROPOSED",
       },
     })
 
@@ -60,11 +62,92 @@ export async function createOffer(input: CreateOfferInput) {
       await applyStatusChangeInTx(
         tx,
         existing,
-        "OFFER_READY",
+        "AWAITING_BUSINESS",
         { actorType: "NEGOTIATOR", actorId: input.negotiatorId },
         "internal",
       )
     }
+
+    return offer
+  })
+}
+
+// Business Portal confirms the Negotiator-drafted terms — this, not offer
+// creation, is what makes a case customer-visible. Reuses the same shared
+// status-transition core the Negotiator and customer paths already go
+// through, so terminal handling/audit stays in the one place it's always
+// lived.
+export async function confirmOffer(caseId: string, offerId: string, businessContactId: string) {
+  const existingCase = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+  const existingOffer = await prisma.offer.findUniqueOrThrow({ where: { id: offerId } })
+
+  if (existingOffer.customerDecision) {
+    throw new Error("The customer has already decided on this offer.")
+  }
+  if (existingOffer.businessConfirmedAt) {
+    throw new Error("This offer has already been confirmed.")
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const offer = await tx.offer.update({
+      where: { id: offerId },
+      data: {
+        status: "PRESENTED",
+        businessContactId,
+        businessConfirmedAt: new Date(),
+        businessFeedback: null,
+      },
+    })
+
+    await recordAudit(tx, {
+      actorType: "BUSINESS",
+      actorId: businessContactId,
+      caseId,
+      action: "OFFER_CONFIRMED",
+      relatedEntityType: "Offer",
+      relatedEntityId: offerId,
+      before: { status: existingOffer.status },
+      after: { status: offer.status },
+      sourceChannel: "business",
+    })
+
+    if (!isTerminal(existingCase.status)) {
+      await applyStatusChangeInTx(
+        tx,
+        existingCase,
+        "OFFER_READY",
+        { actorType: "BUSINESS", actorId: businessContactId },
+        "business",
+      )
+    }
+
+    return offer
+  })
+}
+
+export async function requestOfferChanges(caseId: string, offerId: string, businessContactId: string, note: string) {
+  const existingOffer = await prisma.offer.findUniqueOrThrow({ where: { id: offerId } })
+
+  if (existingOffer.businessConfirmedAt) {
+    throw new Error("This offer has already been confirmed and can no longer be sent back for changes.")
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const offer = await tx.offer.update({
+      where: { id: offerId },
+      data: { businessFeedback: note },
+    })
+
+    await recordAudit(tx, {
+      actorType: "BUSINESS",
+      actorId: businessContactId,
+      caseId,
+      action: "OFFER_CHANGES_REQUESTED",
+      relatedEntityType: "Offer",
+      relatedEntityId: offerId,
+      after: { businessFeedback: note },
+      sourceChannel: "business",
+    })
 
     return offer
   })
@@ -88,6 +171,9 @@ export async function updateOffer(caseId: string, offerId: string, input: Update
   if (existing.customerDecision) {
     throw new Error("The customer has already decided on this offer — it can no longer be edited.")
   }
+  if (existing.businessConfirmedAt) {
+    throw new Error("The business has already confirmed this offer — start a new offer round instead.")
+  }
 
   return prisma.$transaction(async (tx) => {
     const before = { finalPriceCents: existing.finalPriceCents, status: existing.status }
@@ -103,6 +189,9 @@ export async function updateOffer(caseId: string, offerId: string, input: Update
         validUntil: input.validUntil,
         paymentTerms: input.paymentTerms,
         deliveryTerms: input.deliveryTerms,
+        // A re-drafted offer clears any pending business feedback — the
+        // Negotiator's edit is the response to it.
+        businessFeedback: null,
       },
     })
     await recordAudit(tx, {

@@ -32,7 +32,9 @@ export default function LoginPage() {
     }
 
     const body = await res.json()
-    router.push(body.role === "NEGOTIATOR" ? "/negotiator/cases" : "/admin")
+    const destination =
+      body.role === "NEGOTIATOR" ? "/negotiator/cases" : body.role === "BUSINESS" ? "/business/cases" : "/admin"
+    router.push(destination)
     router.refresh()
   }
 
@@ -42,7 +44,7 @@ export default function LoginPage() {
         <h1 className="text-xl font-bold" style={{ color: "#123FA9" }}>
           Staff sign in
         </h1>
-        <p className="text-sm text-slate-500">Negotiator and Admin access.</p>
+        <p className="text-sm text-slate-500">Negotiator, Admin, and Business Partner access.</p>
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <Input
