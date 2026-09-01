@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { motion, useScroll, useTransform, type Variants } from "framer-motion"
+import { motion, useReducedMotion, useScroll, useTransform, type Variants } from "framer-motion"
 import { useRef } from "react"
 import NegotiatorMark from "@/components/negotiator-mark"
 
@@ -79,6 +79,7 @@ const stepItem: Variants = {
 
 export default function HomePage() {
   const heroRef = useRef(null)
+  const reduceMotion = useReducedMotion()
 
   return (
     <div ref={heroRef} className="min-h-screen w-full relative overflow-hidden flex flex-col bg-cream">
@@ -98,9 +99,17 @@ export default function HomePage() {
           <NegotiatorMark size={40} />
           <span className="font-black text-xl tracking-tight text-cobalt-600">The Negotiator</span>
         </div>
-        <span className="hidden sm:inline text-base italic font-serif text-ink-soft">
-          You ask. We negotiate.
-        </span>
+        <div className="flex items-center gap-6">
+          <span className="hidden sm:inline text-base italic font-serif text-ink-soft">
+            You ask. We negotiate.
+          </span>
+          <Link
+            href="/login"
+            className="text-sm font-bold text-cobalt-600 opacity-80 hover:opacity-100 hover:underline underline-offset-4 transition-opacity"
+          >
+            Sign in
+          </Link>
+        </div>
       </motion.header>
 
       {/* main split hero */}
@@ -128,9 +137,15 @@ export default function HomePage() {
           <motion.div variants={heroItem} className="flex flex-wrap gap-4 mb-8">
             <Link href="/request">
               <motion.span
-                whileHover={{ y: -3, boxShadow: "0 16px 40px -12px rgba(18,63,169,0.35)" }}
-                whileTap={{ scale: 0.96 }}
-                transition={{ type: "spring", stiffness: 400, damping: 22 }}
+                animate={reduceMotion ? undefined : { scale: [1, 1.06, 1, 1.04, 1] }}
+                transition={{ duration: 1.1, repeat: Infinity, repeatDelay: 1.6, ease: "easeInOut" }}
+                whileHover={{
+                  scale: 1,
+                  y: -3,
+                  boxShadow: "0 16px 40px -12px rgba(18,63,169,0.35)",
+                  transition: { type: "spring", stiffness: 400, damping: 22 },
+                }}
+                whileTap={{ scale: 0.96, transition: { type: "spring", stiffness: 500, damping: 25 } }}
                 className="inline-flex px-7 py-4 rounded-pill font-bold text-white text-base bg-cobalt-600 shadow-card"
               >
                 Negotiate This For Me
