@@ -135,22 +135,55 @@ export default function HomePage() {
           </motion.p>
 
           <motion.div variants={heroItem} className="flex flex-wrap gap-4 mb-8">
-            <Link href="/request">
-              <motion.span
-                animate={reduceMotion ? undefined : { scale: [1, 1.06, 1, 1.04, 1] }}
-                transition={{ duration: 1.1, repeat: Infinity, repeatDelay: 1.6, ease: "easeInOut" }}
-                whileHover={{
-                  scale: 1,
-                  y: -3,
-                  boxShadow: "0 16px 40px -12px rgba(18,63,169,0.35)",
-                  transition: { type: "spring", stiffness: 400, damping: 22 },
-                }}
-                whileTap={{ scale: 0.96, transition: { type: "spring", stiffness: 500, damping: 25 } }}
-                className="inline-flex px-7 py-4 rounded-pill font-bold text-white text-base bg-cobalt-600 shadow-card"
+            <div className="relative inline-block">
+              {/* hand-drawn pointer — traces in once the hero settles, so
+                  the eye lands on the button right as it starts pulsing */}
+              <motion.svg
+                viewBox="0 0 120 100"
+                className="hidden sm:block absolute -top-14 -right-10 w-24 h-20 pointer-events-none"
+                aria-hidden="true"
               >
-                Negotiate This For Me
-              </motion.span>
-            </Link>
+                <motion.path
+                  d="M 98 8 C 118 26, 82 14, 68 40 C 56 63, 24 53, 17 80"
+                  fill="none"
+                  stroke="#F5A623"
+                  strokeWidth="7"
+                  strokeLinecap="round"
+                  pathLength={1}
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: 1, opacity: 1 }}
+                  transition={{ duration: 1, delay: 1.3, ease: [0.16, 1, 0.3, 1] }}
+                />
+                <motion.path
+                  d="M 30 68 L 17 80 L 32 86"
+                  fill="none"
+                  stroke="#F5A623"
+                  strokeWidth="7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  pathLength={1}
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: 1, opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 2.25 }}
+                />
+              </motion.svg>
+              <Link href="/request">
+                <motion.span
+                  animate={reduceMotion ? undefined : { scale: [1, 1.06, 1, 1.04, 1] }}
+                  transition={{ duration: 1.1, repeat: Infinity, repeatDelay: 1.6, ease: "easeInOut" }}
+                  whileHover={{
+                    scale: 1,
+                    y: -3,
+                    boxShadow: "0 16px 40px -12px rgba(18,63,169,0.35)",
+                    transition: { type: "spring", stiffness: 400, damping: 22 },
+                  }}
+                  whileTap={{ scale: 0.96, transition: { type: "spring", stiffness: 500, damping: 25 } }}
+                  className="inline-flex px-7 py-4 rounded-pill font-bold text-white text-base bg-cobalt-600 shadow-card"
+                >
+                  Negotiate This For Me
+                </motion.span>
+              </Link>
+            </div>
             <a href="#how-it-works">
               <motion.span
                 whileHover={{ backgroundColor: "#123FA9", color: "#ffffff" }}
