@@ -1,6 +1,13 @@
 import { PrismaClient } from "@prisma/client"
+import { hashPassword } from "../src/server/auth/password"
 
 const prisma = new PrismaClient()
+
+// Dev-only credentials — printed to console below, documented in
+// .env.example. No self-registration in this platform (admin-mediated
+// everywhere), so the first Admin account has to come from somewhere.
+const ADMIN_DEV_PASSWORD = "Admin#2026"
+const NEGOTIATOR_DEV_PASSWORD = "Negotiator#2026"
 
 type FieldSeed = { fieldName: string; fieldType: string; required: boolean }
 
@@ -48,7 +55,7 @@ const categories: Array<{
   },
 ]
 
-const negotiators = ["Amara Chen", "Diego Alvarez", "Priya Nair"]
+const negotiatorNames = ["Amara Chen", "Diego Alvarez", "Priya Nair"]
 
 async function main() {
   for (const [index, category] of categories.entries()) {
@@ -73,12 +80,28 @@ async function main() {
     })
   }
 
-  for (const name of negotiators) {
+  const adminEmail = "admin@example.com"
+  const adminExisting = await prisma.user.findUnique({ where: { email: adminEmail } })
+  if (!adminExisting) {
+    const passwordHash = await hashPassword(ADMIN_DEV_PASSWORD)
+    await prisma.user.create({
+      data: { name: "Sam Okafor", email: adminEmail, role: "SUPER_ADMIN", passwordHash },
+    })
+  }
+
+  for (const name of negotiatorNames) {
     const email = `${name.toLowerCase().replace(/\s+/g, ".")}@example.com`
-    await prisma.negotiator.upsert({
-      where: { email },
-      update: {},
-      create: { name, email, active: true },
+    const existing = await prisma.user.findUnique({ where: { email } })
+    if (existing) continue
+
+    const passwordHash = await hashPassword(NEGOTIATOR_DEV_PASSWORD)
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { name, email, role: "NEGOTIATOR", passwordHash },
+      })
+      await tx.negotiator.create({
+        data: { userId: user.id, name, email, active: true },
+      })
     })
   }
 
@@ -91,11 +114,14 @@ async function main() {
       data: {
         name: "Harbor View Hotel",
         description: "Independent hotel, demo business record.",
-        contactName: "Reservations Desk",
-        contactEmail: "reservations@example.com",
         customerVisible: true,
         publishStatus: "PUBLISHED",
+        verificationStatus: "ACTIVE",
+        locations: [{ city: "Chicago", country: "USA" }],
         categories: { create: [{ categoryId: hotels.id }] },
+        contacts: {
+          create: [{ name: "Reservations Desk", email: "reservations@example.com", isPrimary: true }],
+        },
       },
     })
   }
@@ -106,16 +132,26 @@ async function main() {
       data: {
         name: "CityWheels Rentals",
         description: "Local car rental partner, demo business record.",
-        contactName: "Fleet Desk",
-        contactEmail: "fleet@example.com",
         customerVisible: true,
         publishStatus: "PUBLISHED",
+        verificationStatus: "ACTIVE",
+        locations: [{ city: "Chicago", country: "USA" }],
         categories: { create: [{ categoryId: carRentals.id }] },
+        contacts: {
+          create: [{ name: "Fleet Desk", email: "fleet@example.com", isPrimary: true }],
+        },
       },
     })
   }
 
   console.log("Seed complete.")
+  console.log("")
+  console.log("Dev credentials (local only — never used in production):")
+  console.log(`  Admin:      ${adminEmail} / ${ADMIN_DEV_PASSWORD}`)
+  for (const name of negotiatorNames) {
+    const email = `${name.toLowerCase().replace(/\s+/g, ".")}@example.com`
+    console.log(`  Negotiator: ${email} / ${NEGOTIATOR_DEV_PASSWORD}`)
+  }
 }
 
 main()
