@@ -1,13 +1,17 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
+import StatusBadge from "@/components/status-badge"
+import ConfirmDialog, { useConfirmDialog } from "@/components/confirm-dialog"
 import {
   Select,
   SelectContent,
@@ -44,15 +48,17 @@ export default function CategoryDetail(props: {
   const [customerVisible, setCustomerVisible] = useState(c.customerVisible)
   const [status, setStatus] = useState(c.status)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const [fieldName, setFieldName] = useState("")
   const [fieldType, setFieldType] = useState("text")
   const [fieldRequired, setFieldRequired] = useState(false)
 
+  const archiveConfirm = useConfirmDialog()
+  const removeFieldConfirm = useConfirmDialog()
+  const [pendingRemoveField, setPendingRemoveField] = useState<Field | null>(null)
+
   async function saveProfile() {
     setBusy(true)
-    setError(null)
     const res = await fetch(`/api/admin/categories/${c.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -61,27 +67,37 @@ export default function CategoryDetail(props: {
     setBusy(false)
     if (!res.ok) {
       const body = await res.json().catch(() => null)
-      setError(body?.error ?? "Couldn't save.")
+      toast.error(body?.error ?? "Couldn't save.")
       return
     }
+    toast.success("Profile saved.")
     router.refresh()
   }
 
-  async function saveStatus() {
+  async function applyStatus(nextStatus: string) {
     setBusy(true)
-    setError(null)
     const res = await fetch(`/api/admin/categories/${c.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status: nextStatus }),
     })
     setBusy(false)
+    archiveConfirm.setOpen(false)
     if (!res.ok) {
       const body = await res.json().catch(() => null)
-      setError(body?.error ?? "Couldn't change status.")
+      toast.error(body?.error ?? "Couldn't change status.")
       return
     }
+    toast.success(`Status updated to ${nextStatus}.`)
     router.refresh()
+  }
+
+  function saveStatus() {
+    if (status === "ARCHIVED" && c.status !== "ARCHIVED") {
+      archiveConfirm.setOpen(true)
+      return
+    }
+    applyStatus(status)
   }
 
   async function reorder(direction: "up" | "down") {
@@ -106,22 +122,30 @@ export default function CategoryDetail(props: {
     setFieldName("")
     setFieldRequired(false)
     setBusy(false)
+    toast.success("Field added.")
     router.refresh()
   }
 
-  async function removeField(fieldId: string) {
+  function requestRemoveField(field: Field) {
+    setPendingRemoveField(field)
+    removeFieldConfirm.setOpen(true)
+  }
+
+  async function confirmRemoveField() {
+    if (!pendingRemoveField) return
     setBusy(true)
-    await fetch(`/api/admin/categories/${c.id}/fields/${fieldId}`, { method: "DELETE" })
+    await fetch(`/api/admin/categories/${c.id}/fields/${pendingRemoveField.id}`, { method: "DELETE" })
     setBusy(false)
+    removeFieldConfirm.setOpen(false)
+    toast.success(`Removed "${pendingRemoveField.fieldName}".`)
+    setPendingRemoveField(null)
     router.refresh()
   }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-black" style={{ color: "#123FA9" }}>
-          {c.name}
-        </h1>
+        <h1 className="text-2xl font-black text-cobalt-600">{c.name}</h1>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" disabled={busy} onClick={() => reorder("up")}>
             ↑
@@ -129,15 +153,15 @@ export default function CategoryDetail(props: {
           <Button size="sm" variant="outline" disabled={busy} onClick={() => reorder("down")}>
             ↓
           </Button>
-          <Badge>{c.status}</Badge>
+          <StatusBadge status={c.status} />
         </div>
       </div>
 
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-ink-muted">
         {props.businesses.length} businesses · {c.caseCount} cases
       </p>
 
-      <div className="bg-white rounded-xl shadow p-6 space-y-4">
+      <Card className="p-6 space-y-4">
         <div className="space-y-2">
           <Label>Name</Label>
           <Input value={name} onChange={(e) => setName(e.target.value)} />
@@ -154,13 +178,12 @@ export default function CategoryDetail(props: {
           <Checkbox checked={customerVisible} onCheckedChange={(v) => setCustomerVisible(v === true)} />
           <Label>Visible to customers when active</Label>
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
         <Button size="sm" disabled={busy} onClick={saveProfile}>
           Save
         </Button>
-      </div>
+      </Card>
 
-      <div className="bg-white rounded-xl shadow p-6 space-y-3">
+      <Card className="p-6 space-y-3">
         <Label>Status</Label>
         <div className="flex items-center gap-3">
           <Select value={status} onValueChange={setStatus}>
@@ -177,31 +200,29 @@ export default function CategoryDetail(props: {
             Update
           </Button>
         </div>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-ink-muted">
           Archiving removes this category from the customer request flow immediately, without deleting any history.
         </p>
-      </div>
+      </Card>
 
-      <div className="bg-white rounded-xl shadow p-6 space-y-4">
-        <h2 className="font-bold" style={{ color: "#123FA9" }}>
-          Request fields
-        </h2>
+      <Card className="p-6 space-y-4">
+        <h2 className="font-bold text-cobalt-600">Request fields</h2>
         <div className="space-y-2">
           {props.fields.map((field) => (
-            <div key={field.id} className="flex items-center justify-between border rounded-lg p-3">
+            <div key={field.id} className="flex items-center justify-between border border-border rounded-lg p-3">
               <div>
                 <p className="font-bold text-sm">{field.fieldName}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-ink-muted">
                   {field.fieldType} {field.required ? "· required" : ""}
                 </p>
               </div>
-              <Button size="sm" variant="ghost" disabled={busy} onClick={() => removeField(field.id)}>
+              <Button size="sm" variant="ghost" disabled={busy} onClick={() => requestRemoveField(field)}>
                 Remove
               </Button>
             </div>
           ))}
         </div>
-        <div className="border-t pt-4 grid grid-cols-3 gap-3 items-end">
+        <div className="border-t border-border pt-4 grid grid-cols-3 gap-3 items-end">
           <div className="space-y-1 col-span-1">
             <Label>Field name</Label>
             <Input value={fieldName} onChange={(e) => setFieldName(e.target.value)} />
@@ -228,30 +249,49 @@ export default function CategoryDetail(props: {
         <Button size="sm" disabled={busy || !fieldName.trim()} onClick={addField}>
           Add field
         </Button>
-      </div>
+      </Card>
 
-      <div className="bg-white rounded-xl shadow p-6 space-y-2">
-        <h2 className="font-bold" style={{ color: "#123FA9" }}>
-          Businesses in this category
-        </h2>
-        {props.businesses.length === 0 && <p className="text-sm text-slate-500">None yet.</p>}
+      <Card className="p-6 space-y-2">
+        <h2 className="font-bold text-cobalt-600">Businesses in this category</h2>
+        {props.businesses.length === 0 && <p className="text-sm text-ink-muted">None yet.</p>}
         {props.businesses.map((b) => (
-          <p key={b.id} className="text-sm">
+          <Link key={b.id} href={`/admin/businesses/${b.id}`} className="block text-sm text-cobalt-600 hover:underline">
             {b.name}
-          </p>
+          </Link>
         ))}
-      </div>
+      </Card>
 
-      <div className="bg-white rounded-xl shadow p-6 space-y-1">
-        <h2 className="font-bold mb-2" style={{ color: "#123FA9" }}>
-          Audit log
-        </h2>
+      <Card className="p-6 space-y-1">
+        <h2 className="font-bold text-cobalt-600 mb-2">Audit log</h2>
         {props.auditLogs.map((a) => (
-          <p key={a.id} className="text-xs text-slate-500">
+          <p key={a.id} className="text-xs text-ink-muted">
             {new Date(a.createdAt).toLocaleString()} · {a.action} · {a.actorType}
           </p>
         ))}
-      </div>
+      </Card>
+
+      <ConfirmDialog
+        open={archiveConfirm.open}
+        onOpenChange={archiveConfirm.setOpen}
+        title="Archive this category?"
+        description={`"${c.name}" will be removed from the customer request flow immediately, without deleting any history.`}
+        confirmLabel="Archive"
+        busy={busy}
+        onConfirm={() => applyStatus("ARCHIVED")}
+      />
+      <ConfirmDialog
+        open={removeFieldConfirm.open}
+        onOpenChange={removeFieldConfirm.setOpen}
+        title="Remove this field?"
+        description={
+          pendingRemoveField
+            ? `"${pendingRemoveField.fieldName}" will no longer appear on the customer request form for this category.`
+            : ""
+        }
+        confirmLabel="Remove"
+        busy={busy}
+        onConfirm={confirmRemoveField}
+      />
     </div>
   )
 }

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Card } from "@/components/ui/card"
 
 export default function NewCategoryPage() {
   const router = useRouter()
@@ -42,10 +43,9 @@ export default function NewCategoryPage() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-10">
-      <h1 className="text-2xl font-black mb-6" style={{ color: "#123FA9" }}>
-        New category
-      </h1>
-      <form onSubmit={onSubmit} className="bg-white rounded-xl shadow p-6 space-y-4">
+      <h1 className="text-2xl font-black mb-6 text-cobalt-600">New category</h1>
+      <Card className="p-6">
+      <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>
           <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -71,6 +71,7 @@ export default function NewCategoryPage() {
           {submitting ? "Creating…" : "Create category"}
         </Button>
       </form>
+      </Card>
     </div>
   )
 }
