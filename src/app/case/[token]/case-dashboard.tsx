@@ -1,11 +1,35 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { AnimatePresence, motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { formatCents } from "@/lib/money"
 import SiteHeader from "@/components/site-header"
+
+// A financial figure this size is the moment of the whole page — it earns
+// a count-up rather than just appearing. No "already started" guard: the
+// effect must stay idempotent/restartable (React's Strict Mode runs every
+// effect through a mount → cleanup → mount cycle in dev, and a ref-based
+// guard would let the cleanup cancel the one RAF loop that was ever
+// allowed to start, leaving the value stuck at 0).
+function useCountUp(target: number, durationMs = 900) {
+  const [value, setValue] = useState(0)
+  useEffect(() => {
+    const start = performance.now()
+    let raf: number
+    function tick(now: number) {
+      const progress = Math.min((now - start) / durationMs, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setValue(Math.round(target * eased))
+      if (progress < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [target, durationMs])
+  return value
+}
 
 type Message = { id: string; authorType: "NEGOTIATOR" | "CUSTOMER"; body: string; createdAt: string }
 type Offer = {
@@ -77,15 +101,15 @@ function StatusTimeline({ stage }: { stage: Stage }) {
         return (
           <div key={label} className="flex items-center flex-1 last:flex-none">
             <div className="flex flex-col items-center gap-1.5">
-              <span
-                className={
-                  "flex h-3.5 w-3.5 rounded-full shrink-0 transition-colors " +
-                  (done
-                    ? "bg-cobalt-600"
-                    : current
-                      ? "bg-amber-500 ring-4 ring-amber-100 animate-pulse-ring"
-                      : "bg-cobalt-100")
+              <motion.span
+                initial={false}
+                animate={
+                  current
+                    ? { scale: [1, 1.35, 1], backgroundColor: "#F5A623" }
+                    : { scale: 1, backgroundColor: done ? "#123FA9" : "#D7E1F5" }
                 }
+                transition={current ? { duration: 1.6, repeat: Infinity, ease: "easeInOut" } : { duration: 0.4 }}
+                className={"flex h-3.5 w-3.5 rounded-full shrink-0 " + (current ? "ring-4 ring-amber-100" : "")}
                 aria-hidden="true"
               />
               <span
@@ -98,7 +122,15 @@ function StatusTimeline({ stage }: { stage: Stage }) {
               </span>
             </div>
             {i < STAGES.length - 1 && (
-              <div className={"h-0.5 flex-1 mx-1.5 -mt-4 " + (done ? "bg-cobalt-600" : "bg-cobalt-100")} />
+              <div className="h-0.5 flex-1 mx-1.5 -mt-4 bg-cobalt-100 overflow-hidden">
+                <motion.div
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: done ? 1 : 0 }}
+                  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+                  style={{ transformOrigin: "left" }}
+                  className="h-full bg-cobalt-600"
+                />
+              </div>
             )}
           </div>
         )
@@ -164,11 +196,21 @@ export default function CaseDashboard(props: {
     setNotice(res.ok ? "A fresh link is on its way to your email." : "Couldn't resend right now — try again shortly.")
   }
 
+  const priceValue = useCountUp(props.offer?.finalPriceCents ?? 0)
+
   return (
     <div className="min-h-screen bg-cream px-4 pb-16">
       <SiteHeader />
-      <div className="max-w-2xl mx-auto pt-6 space-y-5">
-        <div className="bg-white rounded-panel shadow-card p-6 sm:p-7 animate-fade-up">
+      <motion.div
+        initial="hidden"
+        animate="show"
+        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.1 } } }}
+        className="max-w-2xl mx-auto pt-6 space-y-5"
+      >
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } } }}
+          className="bg-white rounded-panel shadow-card p-6 sm:p-7"
+        >
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-1">{props.caseRef}</p>
@@ -195,18 +237,18 @@ export default function CaseDashboard(props: {
               </p>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {props.offer && (
-          <div
-            className="bg-cobalt-600 rounded-panel shadow-panel p-6 sm:p-8 text-white animate-fade-up"
-            style={{ animationDelay: "80ms" }}
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 16, scale: 0.98 }, show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } } }}
+            className="bg-cobalt-600 rounded-panel shadow-panel p-6 sm:p-8 text-white"
           >
             <p className="text-xs font-bold uppercase tracking-wide text-amber-400 mb-2">
               {props.offer.customerDecision ? "Offer" : "Your offer is ready"}
             </p>
-            <p className="font-black text-4xl sm:text-5xl mb-4 tracking-tight">
-              {formatCents(props.offer.finalPriceCents, props.offer.currency)}
+            <p className="font-black text-4xl sm:text-5xl mb-4 tracking-tight tabular-nums">
+              {formatCents(priceValue, props.offer.currency)}
             </p>
 
             <div className="space-y-3 text-sm border-t border-white/15 pt-4">
@@ -257,29 +299,35 @@ export default function CaseDashboard(props: {
 
             {canDecide ? (
               <div className="flex flex-wrap gap-3 pt-6 mt-2 border-t border-white/15">
-                <Button
-                  disabled={busy}
-                  onClick={() => decide("ACCEPTED")}
-                  className="bg-amber-500 text-ink hover:bg-amber-400 shadow-none"
-                >
-                  Accept
-                </Button>
-                <Button
-                  disabled={busy}
-                  variant="outline"
-                  onClick={() => decide("REQUESTED_ANOTHER_ROUND")}
-                  className="border-white text-white hover:bg-white hover:text-cobalt-600"
-                >
-                  Ask for another round
-                </Button>
-                <Button
-                  disabled={busy}
-                  variant="ghost"
-                  onClick={() => decide("DECLINED")}
-                  className="text-white/70 hover:bg-white/10 hover:text-white"
-                >
-                  Decline
-                </Button>
+                <motion.div whileHover={{ y: -2, scale: 1.02 }} whileTap={{ scale: 0.96 }} transition={{ type: "spring", stiffness: 420, damping: 22 }}>
+                  <Button
+                    disabled={busy}
+                    onClick={() => decide("ACCEPTED")}
+                    className="bg-amber-500 text-ink hover:bg-amber-400 shadow-none"
+                  >
+                    Accept
+                  </Button>
+                </motion.div>
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }} transition={{ type: "spring", stiffness: 420, damping: 22 }}>
+                  <Button
+                    disabled={busy}
+                    variant="outline"
+                    onClick={() => decide("REQUESTED_ANOTHER_ROUND")}
+                    className="border-white text-white hover:bg-white hover:text-cobalt-600"
+                  >
+                    Ask for another round
+                  </Button>
+                </motion.div>
+                <motion.div whileTap={{ scale: 0.96 }}>
+                  <Button
+                    disabled={busy}
+                    variant="ghost"
+                    onClick={() => decide("DECLINED")}
+                    className="text-white/70 hover:bg-white/10 hover:text-white"
+                  >
+                    Decline
+                  </Button>
+                </motion.div>
               </div>
             ) : (
               props.offer.customerDecision && (
@@ -288,37 +336,49 @@ export default function CaseDashboard(props: {
                 </p>
               )
             )}
-          </div>
+          </motion.div>
         )}
 
-        <div className="bg-white rounded-panel shadow-card p-6 sm:p-7 space-y-4 animate-fade-up" style={{ animationDelay: "140ms" }}>
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } } }}
+          className="bg-white rounded-panel shadow-card p-6 sm:p-7 space-y-4"
+        >
           <h2 className="font-bold text-ink">Messages</h2>
           {props.messages.length === 0 && (
             <p className="text-sm text-ink-muted">No messages yet — your Negotiator will reach out here if anything needs clarifying.</p>
           )}
           <div className="space-y-3">
-            {props.messages.map((message) => {
-              const isCustomer = message.authorType === "CUSTOMER"
-              return (
-                <div key={message.id} className={"flex " + (isCustomer ? "justify-end" : "justify-start")}>
-                  <div className={"max-w-[80%] " + (isCustomer ? "text-right" : "text-left")}>
-                    <p className="text-xs text-ink-muted mb-1">
-                      {isCustomer ? "You" : "Negotiator"} · {new Date(message.createdAt).toLocaleString()}
-                    </p>
-                    <p
-                      className={
-                        "inline-block rounded-2xl px-4 py-2.5 text-sm leading-relaxed " +
-                        (isCustomer
-                          ? "bg-cobalt-600 text-white rounded-tr-sm"
-                          : "bg-cream border border-border text-ink rounded-tl-sm")
-                      }
-                    >
-                      {message.body}
-                    </p>
-                  </div>
-                </div>
-              )
-            })}
+            <AnimatePresence initial={false}>
+              {props.messages.map((message, i) => {
+                const isCustomer = message.authorType === "CUSTOMER"
+                return (
+                  <motion.div
+                    key={message.id}
+                    layout
+                    initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.35, delay: Math.min(i * 0.04, 0.3), ease: [0.16, 1, 0.3, 1] }}
+                    className={"flex " + (isCustomer ? "justify-end" : "justify-start")}
+                  >
+                    <div className={"max-w-[80%] " + (isCustomer ? "text-right" : "text-left")}>
+                      <p className="text-xs text-ink-muted mb-1">
+                        {isCustomer ? "You" : "Negotiator"} · {new Date(message.createdAt).toLocaleString()}
+                      </p>
+                      <p
+                        className={
+                          "inline-block rounded-2xl px-4 py-2.5 text-sm leading-relaxed " +
+                          (isCustomer
+                            ? "bg-cobalt-600 text-white rounded-tr-sm"
+                            : "bg-cream border border-border text-ink rounded-tl-sm")
+                        }
+                      >
+                        {message.body}
+                      </p>
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </AnimatePresence>
           </div>
           {!isTerminal && (
             <div className="space-y-2 pt-3 border-t border-border">
@@ -328,23 +388,39 @@ export default function CaseDashboard(props: {
                 value={reply}
                 onChange={(event) => setReply(event.target.value)}
               />
-              <Button disabled={busy || !reply.trim()} onClick={sendReply}>
-                Send
-              </Button>
+              <motion.div className="inline-block" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.95 }} transition={{ type: "spring", stiffness: 420, damping: 22 }}>
+                <Button disabled={busy || !reply.trim()} onClick={sendReply}>
+                  Send
+                </Button>
+              </motion.div>
             </div>
           )}
-        </div>
+        </motion.div>
 
         {!isTerminal && (
-          <div className="text-center">
+          <motion.div
+            variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { duration: 0.4 } } }}
+            className="text-center"
+          >
             <Button variant="ghost" disabled={busy} onClick={resend}>
               Resend my link
             </Button>
-          </div>
+          </motion.div>
         )}
 
-        {notice && <p className="text-center text-sm text-ink-soft">{notice}</p>}
-      </div>
+        <AnimatePresence>
+          {notice && (
+            <motion.p
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="text-center text-sm text-ink-soft"
+            >
+              {notice}
+            </motion.p>
+          )}
+        </AnimatePresence>
+      </motion.div>
     </div>
   )
 }
