@@ -29,6 +29,36 @@ export type ClosureSummaryData = {
   supportEmail: string
 }
 
+export type OfferReadyData = {
+  caseRef: string
+  magicLinkUrl: string
+}
+
+export type InviteReceivedData = {
+  caseRef: string
+  portalUrl: string
+}
+
+export type InviteAcceptedData = {
+  caseRef: string
+  businessName: string
+  portalUrl: string
+}
+
+export type InviteDeclinedData = {
+  caseRef: string
+  businessName: string
+  note?: string | null
+  portalUrl: string
+}
+
+export type OfferChangesRequestedData = {
+  caseRef: string
+  businessName: string
+  note: string
+  portalUrl: string
+}
+
 export function ticketConfirmationEmail(data: TicketConfirmationData) {
   return {
     subject: `We've got your request — ${data.caseRef}`,
@@ -67,6 +97,63 @@ export function closureSummaryEmail(data: ClosureSummaryData) {
       ${offerHtml}
       <p>This is your one-time record — the dashboard link for this case is no longer active.</p>
       <p>Questions? Reach us at <a href="mailto:${data.supportEmail}">${data.supportEmail}</a>.</p>
+    `,
+  }
+}
+
+export function offerReadyEmail(data: OfferReadyData) {
+  return {
+    subject: `Your offer is ready to review — ${data.caseRef}`,
+    html: `
+      <p>Your Negotiator has a confirmed offer ready for your negotiation ticket <strong>${data.caseRef}</strong>.</p>
+      <p>Review it and let us know your decision here:</p>
+      <p><a href="${data.magicLinkUrl}">${data.magicLinkUrl}</a></p>
+    `,
+  }
+}
+
+export function inviteReceivedEmail(data: InviteReceivedData) {
+  return {
+    subject: `New request for your business — ${data.caseRef}`,
+    html: `
+      <p>A Negotiator has invited your business to a new request, <strong>${data.caseRef}</strong>.</p>
+      <p>Review it in your Business Portal:</p>
+      <p><a href="${data.portalUrl}">${data.portalUrl}</a></p>
+    `,
+  }
+}
+
+export function inviteAcceptedEmail(data: InviteAcceptedData) {
+  return {
+    subject: `${escapeHtml(data.businessName)} accepted your invite — ${data.caseRef}`,
+    html: `
+      <p><strong>${escapeHtml(data.businessName)}</strong> accepted your invite on case <strong>${data.caseRef}</strong>.</p>
+      <p>Follow up to discuss terms, then draft an offer:</p>
+      <p><a href="${data.portalUrl}">${data.portalUrl}</a></p>
+    `,
+  }
+}
+
+export function inviteDeclinedEmail(data: InviteDeclinedData) {
+  return {
+    subject: `${escapeHtml(data.businessName)} declined your invite — ${data.caseRef}`,
+    html: `
+      <p><strong>${escapeHtml(data.businessName)}</strong> declined your invite on case <strong>${data.caseRef}</strong>.</p>
+      ${data.note ? `<p>Their note: &ldquo;${escapeHtml(data.note)}&rdquo;</p>` : ""}
+      <p>Route this case to another business:</p>
+      <p><a href="${data.portalUrl}">${data.portalUrl}</a></p>
+    `,
+  }
+}
+
+export function offerChangesRequestedEmail(data: OfferChangesRequestedData) {
+  return {
+    subject: `${escapeHtml(data.businessName)} requested changes — ${data.caseRef}`,
+    html: `
+      <p><strong>${escapeHtml(data.businessName)}</strong> requested changes to your drafted offer on case <strong>${data.caseRef}</strong> before they'll confirm it.</p>
+      <p>Their note: &ldquo;${escapeHtml(data.note)}&rdquo;</p>
+      <p>Revise the offer here:</p>
+      <p><a href="${data.portalUrl}">${data.portalUrl}</a></p>
     `,
   }
 }
