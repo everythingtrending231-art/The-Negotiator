@@ -65,7 +65,7 @@ export function ticketConfirmationEmail(data: TicketConfirmationData) {
     html: `
       <p>Thanks for asking — here's your negotiation ticket <strong>${data.caseRef}</strong>.</p>
       <p>What you told us: ${escapeHtml(data.description)}</p>
-      <p>A real human Negotiator will pick this up shortly. Track progress and hear from them here:</p>
+      <p>Your Negotiator will pick this up shortly. Track progress and hear from them here:</p>
       <p><a href="${data.magicLinkUrl}">${data.magicLinkUrl}</a></p>
       <p>You ask. We negotiate.</p>
     `,

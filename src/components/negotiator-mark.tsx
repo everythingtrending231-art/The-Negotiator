@@ -1,9 +1,16 @@
 interface NegotiatorMarkProps {
   size?: number
   className?: string
+  // When the mark sits on a cobalt (or otherwise dark/saturated) surface,
+  // the cobalt-filled disc/brim/crown otherwise vanish into the
+  // background, leaving only the amber band and cream face floating —
+  // this traces every shape in a thin cream line so the full mark still
+  // reads.
+  onDark?: boolean
 }
 
-export default function NegotiatorMark({ size = 120, className = '' }: NegotiatorMarkProps) {
+export default function NegotiatorMark({ size = 120, className = "", onDark = false }: NegotiatorMarkProps) {
+  const outline = onDark ? { stroke: "#F7F5F0", strokeWidth: 2.5 } : undefined
   return (
     <svg
       width={size}
@@ -14,13 +21,13 @@ export default function NegotiatorMark({ size = 120, className = '' }: Negotiato
       aria-label="The Negotiator mark"
     >
       {/* outer o - cobalt disc */}
-      <circle cx="100" cy="105" r="72" fill="#123FA9" />
+      <circle cx="100" cy="105" r="72" fill="#123FA9" {...outline} />
       {/* inner face - cream */}
       <circle cx="100" cy="108" r="45" fill="#F7F5F0" />
       {/* hat brim */}
-      <ellipse cx="100" cy="46" rx="58" ry="8" fill="#123FA9" />
+      <ellipse cx="100" cy="46" rx="58" ry="8" fill="#123FA9" {...outline} />
       {/* hat crown */}
-      <rect x="72" y="14" width="56" height="38" rx="6" fill="#123FA9" />
+      <rect x="72" y="14" width="56" height="38" rx="6" fill="#123FA9" {...outline} />
       {/* hat band */}
       <rect x="72" y="40" width="56" height="7" fill="#F5A623" />
       {/* mustache - left wing */}

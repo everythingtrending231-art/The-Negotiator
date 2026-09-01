@@ -1,5 +1,27 @@
 import type { Metadata } from "next"
+import { Archivo, Lora } from "next/font/google"
 import "./globals.css"
+
+// Brand direction calls for Liberation Sans — not distributed as a webfont
+// on any CDN available to this build. Archivo is the deliberate substitute:
+// a humanist grotesk in the same family as Arial/Helvetica (so it keeps the
+// "modern, highly legible sans-serif" brief), but with real presence at
+// heavy weights, which Liberation Sans and Arial both lack — needed for
+// headlines to read as headlines rather than bolded body text.
+const archivo = Archivo({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+  variable: "--font-sans",
+  display: "swap",
+})
+
+const lora = Lora({
+  subsets: ["latin"],
+  weight: ["500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-serif",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
   title: "The Negotiator",
@@ -15,15 +37,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;1,500&family=Arial:wght@400;700;900&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="en" className={`${archivo.variable} ${lora.variable}`}>
       <body>{children}</body>
     </html>
   )
