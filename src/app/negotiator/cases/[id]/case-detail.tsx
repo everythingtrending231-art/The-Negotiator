@@ -68,6 +68,15 @@ type Offer = {
 }
 type AuditLogRow = { id: string; action: string; actorType: string; sourceChannel: string; createdAt: string }
 type Business = { id: string; name: string }
+type Invite = {
+  id: string
+  businessId: string
+  businessName: string
+  status: "PENDING" | "ACCEPTED" | "DECLINED" | "WITHDRAWN"
+  responseNote: string | null
+  respondedByName: string | null
+  respondedAt: string | null
+}
 
 export default function CaseDetail(props: {
   negotiationCase: NegotiationCase
@@ -75,6 +84,7 @@ export default function CaseDetail(props: {
   notes: Note[]
   offers: Offer[]
   auditLogs: AuditLogRow[]
+  invites: Invite[]
   currentNegotiator: { id: string; name: string }
   businesses: Business[]
 }) {
@@ -84,6 +94,8 @@ export default function CaseDetail(props: {
   const [note, setNote] = useState("")
   const [message, setMessage] = useState("")
   const [showOfferForm, setShowOfferForm] = useState(false)
+  const [showInviteForm, setShowInviteForm] = useState(false)
+  const [selectedBusinessIds, setSelectedBusinessIds] = useState<string[]>([])
 
   async function withBusy(fn: () => Promise<void>) {
     setBusy(true)
@@ -100,6 +112,26 @@ export default function CaseDetail(props: {
       fetch(`/api/negotiator/cases/${props.negotiationCase.id}/assign`, {
         method: "POST",
       }).then(() => undefined),
+    )
+  }
+
+  async function sendInvites() {
+    if (selectedBusinessIds.length === 0) return
+    await withBusy(() =>
+      fetch(`/api/negotiator/cases/${props.negotiationCase.id}/invites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessIds: selectedBusinessIds }),
+      }).then(() => {
+        setSelectedBusinessIds([])
+        setShowInviteForm(false)
+      }),
+    )
+  }
+
+  function toggleBusiness(businessId: string) {
+    setSelectedBusinessIds((prev) =>
+      prev.includes(businessId) ? prev.filter((id) => id !== businessId) : [...prev, businessId],
     )
   }
 
@@ -201,6 +233,70 @@ export default function CaseDetail(props: {
             Update status
           </Button>
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold" style={{ color: "#123FA9" }}>
+            Requests sent
+          </h2>
+          <Button size="sm" variant="outline" onClick={() => setShowInviteForm((v) => !v)}>
+            {showInviteForm ? "Cancel" : "Send request"}
+          </Button>
+        </div>
+        <p className="text-xs text-slate-400">
+          Route this request to one or more businesses so they can see it and decide whether to engage, before any
+          offer terms exist. Once you draft an offer for one, any other still-pending requests are withdrawn
+          automatically.
+        </p>
+
+        {props.invites.length === 0 && <p className="text-sm text-slate-500">No requests sent yet.</p>}
+        <div className="space-y-2">
+          {props.invites.map((invite) => (
+            <div key={invite.id} className="border rounded-lg p-3 flex items-center justify-between">
+              <div>
+                <p className="font-bold text-sm">{invite.businessName}</p>
+                {invite.responseNote && <p className="text-xs text-slate-500">&ldquo;{invite.responseNote}&rdquo;</p>}
+              </div>
+              <div className="text-right text-xs text-slate-400">
+                <Badge variant={invite.status === "PENDING" ? "outline" : "default"}>{invite.status}</Badge>
+                {invite.respondedByName && (
+                  <p className="mt-1">
+                    {invite.respondedByName} · {new Date(invite.respondedAt!).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {showInviteForm && (
+          <div className="border rounded-lg p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              {props.businesses.map((business) => {
+                const alreadyInvited = props.invites.some((i) => i.businessId === business.id)
+                return (
+                  <label
+                    key={business.id}
+                    className={`flex items-center gap-2 text-sm ${alreadyInvited ? "text-slate-300" : ""}`}
+                  >
+                    <input
+                      type="checkbox"
+                      disabled={alreadyInvited}
+                      checked={selectedBusinessIds.includes(business.id)}
+                      onChange={() => toggleBusiness(business.id)}
+                    />
+                    {business.name}
+                    {alreadyInvited && " (already invited)"}
+                  </label>
+                )
+              })}
+            </div>
+            <Button size="sm" disabled={busy || selectedBusinessIds.length === 0} onClick={sendInvites}>
+              Send to {selectedBusinessIds.length || ""} business{selectedBusinessIds.length === 1 ? "" : "es"}
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow p-6 space-y-4">

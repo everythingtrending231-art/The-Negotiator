@@ -19,6 +19,7 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
       internalNotes: { orderBy: { createdAt: "asc" }, include: { negotiator: true } },
       offers: { orderBy: { createdAt: "desc" }, include: { businessContact: true } },
       auditLogs: { orderBy: { createdAt: "desc" }, take: 50 },
+      invites: { orderBy: { createdAt: "desc" }, include: { business: true, respondedByContact: true } },
     },
   })
 
@@ -85,6 +86,15 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
         actorType: a.actorType,
         sourceChannel: a.sourceChannel,
         createdAt: a.createdAt.toISOString(),
+      }))}
+      invites={negotiationCase.invites.map((i) => ({
+        id: i.id,
+        businessId: i.businessId,
+        businessName: i.business.name,
+        status: i.status,
+        responseNote: i.responseNote,
+        respondedByName: i.respondedByContact?.name ?? null,
+        respondedAt: i.respondedAt?.toISOString() ?? null,
       }))}
       currentNegotiator={{ id: negotiatorId, name: session.name }}
       businesses={businesses.map((b) => ({ id: b.id, name: b.name }))}

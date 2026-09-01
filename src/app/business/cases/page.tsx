@@ -10,13 +10,23 @@ export default async function BusinessCasesPage() {
   const session = await requireRole(["BUSINESS"])
   const contact = await getActingBusinessContact(session)
 
-  const cases = await prisma.negotiationCase.findMany({
-    where: { businessId: contact.businessId },
-    orderBy: { updatedAt: "desc" },
-    include: { category: true, offers: { orderBy: { createdAt: "desc" }, take: 1 } },
-    take: 100,
-  })
+  const [cases, invites] = await Promise.all([
+    prisma.negotiationCase.findMany({
+      where: { businessId: contact.businessId },
+      orderBy: { updatedAt: "desc" },
+      include: { category: true, offers: { orderBy: { createdAt: "desc" }, take: 1 } },
+      take: 100,
+    }),
+    prisma.caseBusinessInvite.findMany({
+      where: { businessId: contact.businessId },
+      orderBy: { createdAt: "desc" },
+      include: { case: { include: { category: true } } },
+      take: 100,
+    }),
+  ])
 
+  const newRequests = invites.filter((i) => i.status === "PENDING")
+  const notPursued = invites.filter((i) => i.status === "DECLINED" || i.status === "WITHDRAWN")
   const awaitingConfirmation = cases.filter((c) => c.status === "AWAITING_BUSINESS")
   const active = cases.filter((c) => c.status !== "AWAITING_BUSINESS" && !TERMINAL_STATUSES.includes(c.status))
   const closed = cases.filter((c) => TERMINAL_STATUSES.includes(c.status))
@@ -27,9 +37,11 @@ export default async function BusinessCasesPage() {
         Cases
       </h1>
 
+      <InviteGroup title="New requests" invites={newRequests} />
       <CaseGroup title="Awaiting your confirmation" cases={awaitingConfirmation} />
       <CaseGroup title="Active" cases={active} />
       <CaseGroup title="Closed / deal history" cases={closed} />
+      <InviteGroup title="Not pursued" invites={notPursued} muted />
     </div>
   )
 }
@@ -40,6 +52,13 @@ type CaseRow = {
   status: string
   category: { name: string }
   offers: { finalPriceCents: number; currency: string }[]
+}
+
+type InviteRow = {
+  id: string
+  status: string
+  caseId: string
+  case: { publicRef: string; category: { name: string } }
 }
 
 function CaseGroup({ title, cases }: { title: string; cases: CaseRow[] }) {
@@ -66,6 +85,34 @@ function CaseGroup({ title, cases }: { title: string; cases: CaseRow[] }) {
                 </p>
               )}
             </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function InviteGroup({ title, invites, muted }: { title: string; invites: InviteRow[]; muted?: boolean }) {
+  // "Not pursued" (muted) only appears once there's history; "New
+  // requests" always renders, even empty, as the primary landing bucket.
+  if (invites.length === 0 && muted) return null
+
+  return (
+    <div>
+      <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-2">{title}</h2>
+      <div className="bg-white rounded-xl shadow divide-y">
+        {invites.length === 0 && <p className="p-4 text-sm text-slate-400">Nothing here.</p>}
+        {invites.map((invite) => (
+          <Link
+            key={invite.id}
+            href={`/business/cases/${invite.caseId}`}
+            className={`flex items-center justify-between px-6 py-4 hover:bg-slate-50 ${muted ? "opacity-60" : ""}`}
+          >
+            <div>
+              <p className="font-bold">{invite.case.publicRef}</p>
+              <p className="text-sm text-slate-500">{invite.case.category.name}</p>
+            </div>
+            <Badge variant="outline">{invite.status}</Badge>
           </Link>
         ))}
       </div>

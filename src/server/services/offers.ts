@@ -58,6 +58,25 @@ export async function createOffer(input: CreateOfferInput) {
       sourceChannel: "internal",
     })
 
+    // We're proceeding with this business now — any other still-pending
+    // invites for this case are moot. Withdraw them (never touches
+    // invites already ACCEPTED/DECLINED, so response history stays
+    // intact) with one summary audit row, not one per invite.
+    const withdrawn = await tx.caseBusinessInvite.updateMany({
+      where: { caseId: input.caseId, businessId: { not: input.businessId }, status: "PENDING" },
+      data: { status: "WITHDRAWN" },
+    })
+    if (withdrawn.count > 0) {
+      await recordAudit(tx, {
+        actorType: "NEGOTIATOR",
+        actorId: input.negotiatorId,
+        caseId: input.caseId,
+        action: "INVITES_WITHDRAWN",
+        after: { count: withdrawn.count },
+        sourceChannel: "internal",
+      })
+    }
+
     if (!isTerminal(existing.status)) {
       await applyStatusChangeInTx(
         tx,

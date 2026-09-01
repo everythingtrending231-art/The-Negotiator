@@ -148,6 +148,7 @@ model Business {
   partnerAgreements PartnerAgreement[]
   offers            Offer[]
   cases             NegotiationCase[]
+  invites           CaseBusinessInvite[]
 }
 
 model BusinessContact {
@@ -167,6 +168,7 @@ model BusinessContact {
   user   User?   @relation(fields: [userId], references: [id])
 
   confirmedOffers Offer[]
+  inviteResponses CaseBusinessInvite[]
 
   @@index([businessId])
 }
@@ -311,8 +313,43 @@ model NegotiationCase {
   internalNotes InternalNote[]
   offers        Offer[]
   auditLogs     AuditLog[]
+  invites       CaseBusinessInvite[]
 
   @@index([status])
+}
+
+// Pre-offer routing: a Negotiator can invite one or several businesses to
+// see a bare request and decide whether to engage, before any offer terms
+// exist. Independent of NegotiationCase.businessId, which still means "the
+// business we're proceeding with" and is only ever set by createOffer —
+// once that happens, any other still-PENDING invites for the case are
+// auto-withdrawn (see offers.ts).
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+}
+
+model CaseBusinessInvite {
+  id         String          @id @default(cuid())
+  caseId     String
+  case       NegotiationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  status InviteStatus @default(PENDING)
+
+  respondedByContactId String?
+  respondedByContact   BusinessContact? @relation(fields: [respondedByContactId], references: [id])
+  responseNote         String?
+  respondedAt          DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([caseId, businessId])
+  @@index([caseId])
+  @@index([businessId])
 }
 
 // ---------------------------------------------------------------------------
