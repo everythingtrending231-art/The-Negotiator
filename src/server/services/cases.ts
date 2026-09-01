@@ -58,7 +58,13 @@ export async function applyStatusChangeInTx(
     }
   }
 
-  return { shouldSendClosureSummary }
+  // Fires whenever a case newly reaches OFFER_READY — via a business
+  // confirming an offer (offers.ts confirmOffer), or a Negotiator manually
+  // overriding status (setCaseStatus below). Guarded on the prior status so
+  // a no-op re-application doesn't re-send.
+  const shouldSendOfferReady = newStatus === "OFFER_READY" && negotiationCase.status !== "OFFER_READY"
+
+  return { shouldSendClosureSummary, shouldSendOfferReady }
 }
 
 async function sendClosureSummaryEmail(caseId: string) {
@@ -92,6 +98,31 @@ async function sendClosureSummaryEmail(caseId: string) {
         : null,
       supportEmail: process.env.SUPPORT_EMAIL ?? "support@example.com",
     },
+  })
+}
+
+// Modeled directly on tickets.ts's resendTicketToken: OFFER_READY doesn't
+// revoke the customer's tokens (only terminal statuses do), but we can't
+// re-embed their original link (the raw token is never persisted), so a
+// fresh one is issued the same way a resend already does elsewhere.
+export async function sendOfferReadyEmail(caseId: string) {
+  const negotiationCase = await prisma.negotiationCase.findUniqueOrThrow({
+    where: { id: caseId },
+    include: { ticket: true },
+  })
+  if (!negotiationCase.ticket || negotiationCase.ticket.status !== "ACTIVE") return
+
+  const ticketId = negotiationCase.ticket.id
+  const raw = await prisma.$transaction(async (tx) => {
+    await revokeTicketTokens(tx, ticketId, caseId)
+    const { raw } = await issueAccessToken(tx, ticketId, caseId)
+    return raw
+  })
+
+  await sendEmail({
+    to: negotiationCase.ticket.customerEmail,
+    template: "offer-ready",
+    data: { caseRef: negotiationCase.publicRef, magicLinkUrl: buildCaseUrl(raw) },
   })
 }
 
@@ -200,12 +231,15 @@ export async function assignNegotiator(caseId: string, negotiatorId: string) {
 export async function setCaseStatus(caseId: string, newStatus: CaseStatus, negotiatorId: string) {
   const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
 
-  const { shouldSendClosureSummary } = await prisma.$transaction((tx) =>
+  const { shouldSendClosureSummary, shouldSendOfferReady } = await prisma.$transaction((tx) =>
     applyStatusChangeInTx(tx, existing, newStatus, { actorType: "NEGOTIATOR", actorId: negotiatorId }, "internal"),
   )
 
   if (shouldSendClosureSummary) {
     await sendClosureSummaryEmail(caseId)
+  }
+  if (shouldSendOfferReady) {
+    await sendOfferReadyEmail(caseId)
   }
 
   return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })

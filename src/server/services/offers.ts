@@ -1,6 +1,8 @@
 import { prisma } from "@/server/db"
 import { recordAudit } from "@/server/audit"
-import { applyStatusChangeInTx, isTerminal } from "@/server/services/cases"
+import { applyStatusChangeInTx, isTerminal, sendOfferReadyEmail } from "@/server/services/cases"
+import { sendEmail } from "@/server/email/send"
+import { buildNegotiatorCaseUrl } from "@/server/urls"
 
 export type CreateOfferInput = {
   caseId: string
@@ -107,7 +109,7 @@ export async function confirmOffer(caseId: string, offerId: string, businessCont
     throw new Error("This offer has already been confirmed.")
   }
 
-  return prisma.$transaction(async (tx) => {
+  const { offer, shouldSendOfferReady } = await prisma.$transaction(async (tx) => {
     const offer = await tx.offer.update({
       where: { id: offerId },
       data: {
@@ -130,18 +132,26 @@ export async function confirmOffer(caseId: string, offerId: string, businessCont
       sourceChannel: "business",
     })
 
+    let shouldSendOfferReady = false
     if (!isTerminal(existingCase.status)) {
-      await applyStatusChangeInTx(
+      const result = await applyStatusChangeInTx(
         tx,
         existingCase,
         "OFFER_READY",
         { actorType: "BUSINESS", actorId: businessContactId },
         "business",
       )
+      shouldSendOfferReady = result.shouldSendOfferReady
     }
 
-    return offer
+    return { offer, shouldSendOfferReady }
   })
+
+  if (shouldSendOfferReady) {
+    await sendOfferReadyEmail(caseId)
+  }
+
+  return offer
 }
 
 export async function requestOfferChanges(caseId: string, offerId: string, businessContactId: string, note: string) {
@@ -151,7 +161,7 @@ export async function requestOfferChanges(caseId: string, offerId: string, busin
     throw new Error("This offer has already been confirmed and can no longer be sent back for changes.")
   }
 
-  return prisma.$transaction(async (tx) => {
+  const offer = await prisma.$transaction(async (tx) => {
     const offer = await tx.offer.update({
       where: { id: offerId },
       data: { businessFeedback: note },
@@ -170,6 +180,29 @@ export async function requestOfferChanges(caseId: string, offerId: string, busin
 
     return offer
   })
+
+  const negotiationCase = await prisma.negotiationCase.findUnique({
+    where: { id: caseId },
+    include: {
+      business: { select: { name: true } },
+      assignedNegotiator: { include: { user: { select: { email: true } } } },
+    },
+  })
+  const negotiatorEmail = negotiationCase?.assignedNegotiator?.user?.email
+  if (negotiationCase && negotiatorEmail) {
+    await sendEmail({
+      to: negotiatorEmail,
+      template: "offer-changes-requested",
+      data: {
+        caseRef: negotiationCase.publicRef,
+        businessName: negotiationCase.business?.name ?? "The business",
+        note,
+        portalUrl: buildNegotiatorCaseUrl(caseId),
+      },
+    })
+  }
+
+  return offer
 }
 
 export type UpdateOfferInput = {

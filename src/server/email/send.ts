@@ -3,15 +3,30 @@ import {
   ticketConfirmationEmail,
   magicLinkResendEmail,
   closureSummaryEmail,
+  offerReadyEmail,
+  inviteReceivedEmail,
+  inviteAcceptedEmail,
+  inviteDeclinedEmail,
+  offerChangesRequestedEmail,
   type TicketConfirmationData,
   type MagicLinkResendData,
   type ClosureSummaryData,
+  type OfferReadyData,
+  type InviteReceivedData,
+  type InviteAcceptedData,
+  type InviteDeclinedData,
+  type OfferChangesRequestedData,
 } from "@/server/email/templates"
 
 type TemplateMap = {
   "ticket-confirmation": TicketConfirmationData
   "magic-link-resend": MagicLinkResendData
   "closure-summary": ClosureSummaryData
+  "offer-ready": OfferReadyData
+  "invite-received": InviteReceivedData
+  "invite-accepted": InviteAcceptedData
+  "invite-declined": InviteDeclinedData
+  "offer-changes-requested": OfferChangesRequestedData
 }
 
 export type EmailTemplate = keyof TemplateMap
@@ -24,6 +39,16 @@ function render<T extends EmailTemplate>(template: T, data: TemplateMap[T]) {
       return magicLinkResendEmail(data as MagicLinkResendData)
     case "closure-summary":
       return closureSummaryEmail(data as ClosureSummaryData)
+    case "offer-ready":
+      return offerReadyEmail(data as OfferReadyData)
+    case "invite-received":
+      return inviteReceivedEmail(data as InviteReceivedData)
+    case "invite-accepted":
+      return inviteAcceptedEmail(data as InviteAcceptedData)
+    case "invite-declined":
+      return inviteDeclinedEmail(data as InviteDeclinedData)
+    case "offer-changes-requested":
+      return offerChangesRequestedEmail(data as OfferChangesRequestedData)
     default: {
       const exhaustive: never = template
       throw new Error(`Unknown email template: ${exhaustive}`)

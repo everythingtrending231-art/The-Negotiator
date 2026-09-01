@@ -1,6 +1,8 @@
 import { prisma } from "@/server/db"
 import { recordAudit } from "@/server/audit"
 import { applyStatusChangeInTx } from "@/server/services/cases"
+import { sendEmail } from "@/server/email/send"
+import { buildBusinessCaseUrl, buildNegotiatorCaseUrl } from "@/server/urls"
 
 // Pre-offer routing (Business Portal request inbox): a Negotiator can
 // invite one or several businesses to see a bare request and decide
@@ -46,6 +48,22 @@ export async function sendInvites(caseId: string, businessIds: string[], negotia
     return invites
   })
 
+  if (created.length > 0) {
+    const contacts = await prisma.businessContact.findMany({
+      where: { businessId: { in: created.map((invite) => invite.businessId) }, userId: { not: null } },
+      include: { user: { select: { email: true } } },
+    })
+    const portalUrl = buildBusinessCaseUrl(caseId)
+    for (const contact of contacts) {
+      if (!contact.user) continue
+      await sendEmail({
+        to: contact.user.email,
+        template: "invite-received",
+        data: { caseRef: existingCase.publicRef, portalUrl },
+      })
+    }
+  }
+
   return { created, skipped: businessIds.length - toInvite.length }
 }
 
@@ -55,12 +73,18 @@ export async function respondToInvite(
   decision: "ACCEPTED" | "DECLINED",
   note?: string,
 ) {
-  const existing = await prisma.caseBusinessInvite.findUniqueOrThrow({ where: { id: inviteId } })
+  const existing = await prisma.caseBusinessInvite.findUniqueOrThrow({
+    where: { id: inviteId },
+    include: {
+      business: { select: { name: true } },
+      case: { include: { assignedNegotiator: { include: { user: { select: { email: true } } } } } },
+    },
+  })
   if (existing.status !== "PENDING") {
     throw new Error("This request has already been responded to.")
   }
 
-  return prisma.$transaction(async (tx) => {
+  const invite = await prisma.$transaction(async (tx) => {
     const invite = await tx.caseBusinessInvite.update({
       where: { id: inviteId },
       data: {
@@ -84,4 +108,24 @@ export async function respondToInvite(
 
     return invite
   })
+
+  const negotiatorEmail = existing.case.assignedNegotiator?.user?.email
+  if (negotiatorEmail) {
+    const portalUrl = buildNegotiatorCaseUrl(existing.caseId)
+    if (decision === "ACCEPTED") {
+      await sendEmail({
+        to: negotiatorEmail,
+        template: "invite-accepted",
+        data: { caseRef: existing.case.publicRef, businessName: existing.business.name, portalUrl },
+      })
+    } else {
+      await sendEmail({
+        to: negotiatorEmail,
+        template: "invite-declined",
+        data: { caseRef: existing.case.publicRef, businessName: existing.business.name, note: note ?? null, portalUrl },
+      })
+    }
+  }
+
+  return invite
 }
