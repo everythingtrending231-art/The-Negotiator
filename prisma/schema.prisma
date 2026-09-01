@@ -1,0 +1,571 @@
+// The Negotiator data model — Phase 1 (Concierge MVP) core case/offer/
+// ticket-access shape, extended in Phase 2 Stage 1 with staff identity/
+// roles and the Category & Business CMS.
+// Money is stored as integer minor units (cents) + a currency string, not
+// Prisma's Decimal type, because Decimal is unsupported on the SQLite
+// datasource this build uses (see CLAUDE.md / plan assumptions).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Staff identity & roles (Phase 2 Stage 1). Hand-rolled email+password,
+// extending Phase 1's HMAC-cookie session pattern rather than adding an
+// auth library. MFA is a known, accepted gap this pass (docs/08 §7).
+// ---------------------------------------------------------------------------
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  NEGOTIATOR
+  BUSINESS
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  negotiatorProfile      Negotiator?
+  businessContactProfile BusinessContact?
+
+  createdCategories        Category[]         @relation("CategoryCreatedBy")
+  updatedCategories        Category[]         @relation("CategoryUpdatedBy")
+  createdBusinesses        Business[]         @relation("BusinessCreatedBy")
+  updatedBusinesses        Business[]         @relation("BusinessUpdatedBy")
+  ownedBusinesses          Business[]         @relation("BusinessRelationshipOwner")
+  businessNotes            BusinessNote[]
+  createdPartnerAgreements PartnerAgreement[] @relation("PartnerAgreementCreatedBy")
+}
+
+// ---------------------------------------------------------------------------
+// Categories & businesses. Data model per docs/22_CATEGORY_AND_BUSINESS_CMS.md
+// (Phase 2 Stage 1 adds the Admin CMS UI on top of the shape Phase 1 seeded).
+// ---------------------------------------------------------------------------
+
+enum CategoryStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model Category {
+  id              String         @id @default(cuid())
+  name            String         @unique
+  description     String?
+  icon            String?
+  status          CategoryStatus @default(ACTIVE)
+  customerVisible Boolean        @default(true)
+  displayOrder    Int            @default(0)
+
+  // Self-relation added now per docs/22 §11 (still an open decision on
+  // whether sub-categories are needed at launch) so no future migration is
+  // required — no sub-category-aware UI/routing is built this stage.
+  parentCategoryId String?
+  parentCategory   Category?  @relation("CategoryParent", fields: [parentCategoryId], references: [id])
+  subCategories    Category[] @relation("CategoryParent")
+
+  createdBy     String?
+  createdByUser User?   @relation("CategoryCreatedBy", fields: [createdBy], references: [id])
+  updatedBy     String?
+  updatedByUser User?   @relation("CategoryUpdatedBy", fields: [updatedBy], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fields     CategoryField[]
+  businesses BusinessCategory[]
+  cases      NegotiationCase[]
+}
+
+model CategoryField {
+  id           String   @id @default(cuid())
+  categoryId   String
+  category     Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  fieldName    String
+  fieldType    String // "text" | "number" | "date" | "select" — Phase 1 renders a plain input for every type
+  required     Boolean  @default(false)
+  displayOrder Int      @default(0)
+
+  @@index([categoryId])
+}
+
+// docs/22 §5.1's exact 6-value set. docs/05 §10 describes a fuller 8-stage
+// narrative partner lifecycle (…→ Negotiation → Approved → Active → Review
+// → Renew/Suspend/Terminate); docs/22 is the operative CMS field spec being
+// implemented here, so its collapse to 6 states is what's modeled.
+enum BusinessVerificationStatus {
+  PROSPECT
+  QUALIFIED
+  VERIFIED
+  ACTIVE
+  SUSPENDED
+  TERMINATED
+}
+
+model Business {
+  id              String  @id @default(cuid())
+  name            String
+  description     String?
+  logoUrl         String?
+  customerVisible Boolean @default(true)
+  publishStatus   String  @default("PUBLISHED")
+
+  verificationStatus BusinessVerificationStatus @default(PROSPECT)
+  statusReasonCode   String?
+  statusEffectiveAt  DateTime?
+
+  // Array of address-shaped objects. Matches the existing precedent of
+  // NegotiationCase.categoryFieldValues being JSON where full relational
+  // modeling isn't yet justified — no querying/filtering by location today.
+  locations Json?
+
+  relationshipOwnerId String?
+  relationshipOwner   User?   @relation("BusinessRelationshipOwner", fields: [relationshipOwnerId], references: [id])
+
+  createdBy     String?
+  createdByUser User?   @relation("BusinessCreatedBy", fields: [createdBy], references: [id])
+  updatedBy     String?
+  updatedByUser User?   @relation("BusinessUpdatedBy", fields: [updatedBy], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  categories        BusinessCategory[]
+  contacts          BusinessContact[]
+  notes             BusinessNote[]
+  partnerAgreements PartnerAgreement[]
+  offers            Offer[]
+  cases             NegotiationCase[]
+  invites           CaseBusinessInvite[]
+}
+
+model BusinessContact {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  role       String?
+  email      String?
+  phone      String?
+  isPrimary  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  // Nullable — a contact is just a contact until an Admin explicitly
+  // grants Business Portal access (Phase 2 Stage 2).
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id])
+
+  confirmedOffers Offer[]
+  inviteResponses CaseBusinessInvite[]
+
+  @@index([businessId])
+}
+
+// Admin-facing notes about the business *relationship* — distinct from
+// per-case InternalNote, same append-only, never-customer-visible pattern.
+model BusinessNote {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id])
+  body       String
+  createdAt  DateTime @default(now())
+
+  @@index([businessId])
+}
+
+// No field-level spec exists anywhere in the docs (docs/06 is prose-only
+// guidance). This is a proportionate, explicitly provisional translation —
+// see plan assumptions, not a documented spec.
+enum AgreementType {
+  PERCENTAGE_DISCOUNT
+  FIXED_NEGOTIATED_PRICE
+  VOLUME_PRICING
+  BUNDLE
+  ADDED_VALUE
+  PRIORITY_SERVICE
+  PREFERRED_TERMS
+  SEASONAL_ARRANGEMENT
+  CASE_BY_CASE
+  COMBINATION
+}
+
+model PartnerAgreement {
+  id            String        @id @default(cuid())
+  businessId    String
+  business      Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agreementType AgreementType
+  effectiveDate DateTime
+  termEndDate   DateTime?
+  autoRenew     Boolean       @default(false)
+
+  negotiationAuthorityNotes String? // docs/06 §5
+  paymentTermsText          String? // docs/06 §8
+  serviceLevelsText         String? // docs/06 §9
+  terminationTermsText      String? // docs/06 §13
+  confidentialityNotes      String? // docs/06 §6
+
+  createdBy     String?
+  createdByUser User?    @relation("PartnerAgreementCreatedBy", fields: [createdBy], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([businessId])
+}
+
+model BusinessCategory {
+  businessId String
+  categoryId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([businessId, categoryId])
+}
+
+model Negotiator {
+  id     String  @id @default(cuid())
+  userId String  @unique
+  user   User    @relation(fields: [userId], references: [id])
+  name   String
+  email  String? @unique
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  assignedCases NegotiationCase[]
+  messages      Message[]
+  notes         InternalNote[]
+  offers        Offer[]
+}
+
+// ---------------------------------------------------------------------------
+// The negotiation case itself
+// ---------------------------------------------------------------------------
+
+enum CaseStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  ASSIGNED
+  NEGOTIATING
+  AWAITING_BUSINESS
+  AWAITING_CUSTOMER
+  OFFER_READY
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELLED
+  COMPLETED
+  DISPUTED
+  CLOSED
+}
+
+model NegotiationCase {
+  id        String @id @default(cuid())
+  // Human-facing "Negotiation ID" (e.g. NEG-000123) — the only case
+  // identifier ever shown to a customer. Never the DB id, never the token.
+  publicRef String @unique
+
+  status CaseStatus @default(SUBMITTED)
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  businessId String?
+  business   Business? @relation(fields: [businessId], references: [id])
+
+  assignedNegotiatorId String?
+  assignedNegotiator   Negotiator? @relation(fields: [assignedNegotiatorId], references: [id])
+
+  description           String
+  url                   String?
+  targetPriceCents      Int?
+  maxBudgetCents        Int?
+  currency              String    @default("USD")
+  quantity              Int?
+  desiredDate           DateTime?
+  location              String?
+  notes                 String?
+  // Answers to the selected category's CategoryFields, keyed by field id.
+  // Not normalized relationally — Phase 1 categories are seed-only, so a
+  // dedicated answer table isn't justified yet.
+  categoryFieldValues   Json?
+  estimatedNextUpdateAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ticket        NegotiationTicket?
+  messages      Message[]
+  internalNotes InternalNote[]
+  offers        Offer[]
+  auditLogs     AuditLog[]
+  invites       CaseBusinessInvite[]
+
+  @@index([status])
+}
+
+// Pre-offer routing: a Negotiator can invite one or several businesses to
+// see a bare request and decide whether to engage, before any offer terms
+// exist. Independent of NegotiationCase.businessId, which still means "the
+// business we're proceeding with" and is only ever set by createOffer —
+// once that happens, any other still-PENDING invites for the case are
+// auto-withdrawn (see offers.ts).
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+}
+
+model CaseBusinessInvite {
+  id         String          @id @default(cuid())
+  caseId     String
+  case       NegotiationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  status InviteStatus @default(PENDING)
+
+  respondedByContactId String?
+  respondedByContact   BusinessContact? @relation(fields: [respondedByContactId], references: [id])
+  responseNote         String?
+  respondedAt          DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([caseId, businessId])
+  @@index([caseId])
+  @@index([businessId])
+}
+
+// ---------------------------------------------------------------------------
+// Ticket-based customer access (docs/08_PLATFORM_ARCHITECTURE.md §4.3)
+// ---------------------------------------------------------------------------
+
+model NegotiationTicket {
+  id                String          @id @default(cuid())
+  negotiationCaseId String          @unique
+  negotiationCase   NegotiationCase @relation(fields: [negotiationCaseId], references: [id], onDelete: Cascade)
+
+  customerEmail String
+
+  customerAccountId String?
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id])
+
+  status               String    @default("ACTIVE") // ACTIVE | CLOSED
+  closedAt             DateTime?
+  // Idempotency guard: closure-summary email fires exactly once per ticket.
+  closureSummarySentAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  accessTokens AccessToken[]
+
+  @@index([customerEmail])
+}
+
+model AccessToken {
+  id       String            @id @default(cuid())
+  ticketId String
+  ticket   NegotiationTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  // sha256 of the raw token. The raw value only ever exists in the emailed
+  // URL — it is never persisted or logged in plaintext outside EmailLog's
+  // dev-outbox use case (see prisma seed / plan assumption 8).
+  tokenHash String @unique
+
+  issuedAt  DateTime  @default(now())
+  expiresAt DateTime
+  // Modeled per docs/08 §4.3; Phase 1's provisional interpretation is
+  // "single-use per resend" (see src/server/services/tokens.ts), not
+  // single-use per dashboard visit — docs/21_OPEN_DECISIONS.md marks the
+  // real policy TBD.
+  singleUse Boolean   @default(true)
+  usedAt    DateTime?
+  revokedAt DateTime?
+
+  @@index([ticketId])
+}
+
+// Optional persistent account (never required — see PRD §6a). Stub table
+// only in Phase 1: no linking UI/flow yet.
+model CustomerAccount {
+  id    String @id @default(cuid())
+  email String @unique
+
+  createdAt DateTime @default(now())
+
+  tickets NegotiationTicket[]
+}
+
+// ---------------------------------------------------------------------------
+// Case activity: messages, internal notes, offers
+// ---------------------------------------------------------------------------
+
+enum MessageAuthorType {
+  NEGOTIATOR
+  CUSTOMER
+}
+
+// Customer <-> Negotiator clarification Q&A. Customer-visible.
+model Message {
+  id     String          @id @default(cuid())
+  caseId String
+  case   NegotiationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  authorType         MessageAuthorType
+  authorNegotiatorId String?
+  authorNegotiator   Negotiator?       @relation(fields: [authorNegotiatorId], references: [id])
+  body               String
+
+  createdAt DateTime @default(now())
+
+  @@index([caseId])
+}
+
+// Deliberately a separate model from Message, not a visibility flag on it —
+// a wrong default on a shared model is exactly the kind of bug that could
+// leak "never customer-visible" notes to the customer dashboard.
+model InternalNote {
+  id     String          @id @default(cuid())
+  caseId String
+  case   NegotiationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  negotiatorId String
+  negotiator   Negotiator @relation(fields: [negotiatorId], references: [id])
+  body         String
+
+  createdAt DateTime @default(now())
+
+  @@index([caseId])
+}
+
+enum OfferStatus {
+  PROPOSED
+  PRESENTED
+  ACCEPTED
+  DECLINED
+  SUPERSEDED
+  EXPIRED
+}
+
+enum CustomerDecisionType {
+  ACCEPTED
+  DECLINED
+  REQUESTED_ANOTHER_ROUND
+}
+
+// Fields per docs/02_PRODUCT_REQUIREMENTS.md §9 ("Offer Object"). Multiple
+// offers per case are supported (negotiation rounds); the dashboard shows
+// the latest non-superseded offer.
+model Offer {
+  id     String          @id @default(cuid())
+  caseId String
+  case   NegotiationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+
+  negotiatorId String
+  negotiator   Negotiator @relation(fields: [negotiatorId], references: [id])
+
+  originalValueCents Int?
+  finalPriceCents    Int
+  currency           String    @default("USD")
+  includedGoods      String
+  additionalBenefits String?
+  conditions         String?
+  validUntil         DateTime?
+  paymentTerms       String?
+  deliveryTerms      String?
+
+  status           OfferStatus           @default(PROPOSED)
+  customerDecision CustomerDecisionType?
+  decidedAt        DateTime?
+
+  // Phase 2 Stage 2: the Negotiator drafts every offer after negotiating
+  // with the business by phone; PROPOSED means "drafted, awaiting business
+  // confirmation," PRESENTED means "business-confirmed, customer-visible."
+  // No new OfferStatus value was needed — these names already meant this,
+  // just weren't wired up to a real gate before this stage.
+  businessContactId   String?
+  businessContact     BusinessContact? @relation(fields: [businessContactId], references: [id])
+  businessConfirmedAt DateTime?
+  // The business's note when requesting changes — overwritten on each
+  // request, cleared on the Negotiator's next edit.
+  businessFeedback    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([caseId])
+}
+
+// ---------------------------------------------------------------------------
+// Audit + email QA infrastructure
+// ---------------------------------------------------------------------------
+
+enum ActorType {
+  CUSTOMER
+  NEGOTIATOR
+  ADMIN
+  BUSINESS
+  SYSTEM
+}
+
+// Every material action (docs/08_PLATFORM_ARCHITECTURE.md §6,
+// docs/20_ENGINEERING_BIBLE.md §10) goes through recordAudit() in the
+// shared service layer, inside the same transaction as the write it
+// documents — never bolted on ad hoc per route.
+model AuditLog {
+  id String @id @default(cuid())
+
+  actorType ActorType
+  actorId   String?
+
+  caseId String?
+  case   NegotiationCase? @relation(fields: [caseId], references: [id])
+
+  action String // e.g. CASE_CREATED, CASE_ASSIGNED, STATUS_CHANGED, OFFER_CREATED, OFFER_UPDATED, MESSAGE_SENT, NOTE_ADDED, TOKEN_ISSUED, TOKEN_USED, TOKEN_REVOKED
+
+  beforeJson Json?
+  afterJson  Json?
+
+  relatedEntityType String?
+  relatedEntityId   String?
+
+  sourceChannel String // web | internal | system
+
+  createdAt DateTime @default(now())
+
+  @@index([caseId])
+  @@index([action])
+}
+
+// New, undocumented QA infrastructure (not in any foundation doc) — exists
+// purely so magic links can be retrieved and verified in this sandbox
+// without a live inbox. Exposes magic-link URLs to any authenticated Admin;
+// must be removed or hardened before a real production deploy.
+model EmailLog {
+  id             String   @id @default(cuid())
+  to             String
+  subject        String
+  template       String
+  dataJson       Json
+  providerStatus String // sent | logged_only | send_failed
+  sentAt         DateTime @default(now())
+}

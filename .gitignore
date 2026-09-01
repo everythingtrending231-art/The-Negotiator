@@ -1,0 +1,33 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Next.js
+.next/
+next-env.d.ts
+
+# TypeScript
+*.tsbuildinfo
+
+# Prisma / local DB
+prisma/*.db
+prisma/*.db-journal
+
+# Env
+.env
+.env*.local
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# OS
+.DS_Store
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
