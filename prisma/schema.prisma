@@ -1,16 +1,16 @@
 // The Negotiator data model — Phase 1 (Concierge MVP) core case/offer/
 // ticket-access shape, extended in Phase 2 Stage 1 with staff identity/
 // roles and the Category & Business CMS.
-// Money is stored as integer minor units (cents) + a currency string, not
-// Prisma's Decimal type, because Decimal is unsupported on the SQLite
-// datasource this build uses (see CLAUDE.md / plan assumptions).
+// Money is stored as integer minor units (cents) + a currency string —
+// avoids floating-point rounding and any Decimal/currency ambiguity,
+// kept even after the move to Postgres (see docs/19 money conventions).
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
