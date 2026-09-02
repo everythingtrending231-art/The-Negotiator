@@ -113,6 +113,13 @@ function MediaBlockRow({ block }: { block: Block }) {
         access: "public",
         handleUploadUrl: "/api/admin/content/upload",
         clientPayload: block.id,
+        // A rejection the client library can't classify (an unexpected
+        // response shape from the blob API, a proxy/edge-layer block, etc.)
+        // falls back to its "unknown_error" bucket, which it retries up to
+        // 10x with backoff — that can hang the button for minutes on a
+        // failure that will never succeed. Cap it so a real failure surfaces
+        // quickly instead.
+        abortSignal: AbortSignal.timeout(30_000),
       })
       const res = await fetch(`/api/admin/content/${block.id}`, {
         method: "PATCH",
