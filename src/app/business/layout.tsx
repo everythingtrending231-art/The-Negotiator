@@ -12,7 +12,10 @@ export default async function BusinessLayout({ children }: { children: React.Rea
       maxWidthClassName="max-w-4xl"
       nav={[
         { label: "Cases", href: "/business/cases" },
+        { label: "Relationship", href: "/business/relationship" },
+        { label: "Reports", href: "/business/reports" },
         { label: "Profile", href: "/business/profile" },
+        { label: "Settings", href: "/business/settings" },
       ]}
     >
       {children}

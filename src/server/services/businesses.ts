@@ -269,12 +269,22 @@ export async function createPartnerAgreement(businessId: string, input: PartnerA
 // approximated by offer-rate since the schema has no dedicated "business
 // responded" event; a proxy, not a precise metric.
 export async function computeBusinessPerformanceSummary(businessId: string) {
-  const [casesInvolvedCount, offersCount, acceptedOffersCount, disputedCasesCount] = await Promise.all([
-    prisma.negotiationCase.count({ where: { businessId } }),
-    prisma.offer.count({ where: { businessId } }),
-    prisma.offer.count({ where: { businessId, customerDecision: "ACCEPTED" } }),
-    prisma.negotiationCase.count({ where: { businessId, status: "DISPUTED" } }),
-  ])
+  const [casesInvolvedCount, offersCount, acceptedOffersCount, disputedCasesCount, offersWithOriginal] =
+    await Promise.all([
+      prisma.negotiationCase.count({ where: { businessId } }),
+      prisma.offer.count({ where: { businessId } }),
+      prisma.offer.count({ where: { businessId, customerDecision: "ACCEPTED" } }),
+      prisma.negotiationCase.count({ where: { businessId, status: "DISPUTED" } }),
+      prisma.offer.findMany({
+        where: { businessId, originalValueCents: { not: null } },
+        select: { originalValueCents: true, finalPriceCents: true },
+      }),
+    ])
+
+  // Same "fetch rows, average in JS" approach as getPlatformAnalytics's
+  // avgPriceImprovementCents — not a natural SQL aggregate via Prisma.
+  const improvements = offersWithOriginal.map((o) => o.originalValueCents! - o.finalPriceCents)
+  const avgValueCreated = improvements.length > 0 ? improvements.reduce((sum, v) => sum + v, 0) / improvements.length : null
 
   return {
     casesInvolvedCount,
@@ -283,6 +293,7 @@ export async function computeBusinessPerformanceSummary(businessId: string) {
     acceptedOffersCount,
     acceptanceRate: offersCount > 0 ? acceptedOffersCount / offersCount : null,
     disputedCasesCount,
+    avgValueCreated,
   }
 }
 
