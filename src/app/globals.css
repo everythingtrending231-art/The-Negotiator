@@ -89,6 +89,17 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  /* animate-cta-pulse's keyframes end on a fully transparent, zero-spread
+     box-shadow — collapsing it to one near-instant iteration (per the rule
+     above) means it settles on that invisible end frame, leaving the CTA
+     with no visual cue at all rather than a merely-static one. Give it a
+     fixed, non-animated ring instead so the "look here" cue survives with
+     zero motion. */
+  .animate-cta-pulse {
+    animation: none !important;
+    box-shadow: 0 0 0 8px rgba(245, 166, 35, 0.35);
+  }
 }
 
 @layer utilities {
