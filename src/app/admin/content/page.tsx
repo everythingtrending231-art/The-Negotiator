@@ -1,15 +1,8 @@
-import { prisma } from "@/server/db"
+import { getAllContentBlocksGrouped } from "@/server/services/content"
 import ContentEditor from "@/app/admin/content/content-editor"
 
 export default async function AdminContentPage() {
-  const blocks = await prisma.contentBlock.findMany({
-    orderBy: [{ page: "asc" }, { displayOrder: "asc" }],
-  })
-
-  const byPage = blocks.reduce<Record<string, typeof blocks>>((acc, b) => {
-    ;(acc[b.page] ??= []).push(b)
-    return acc
-  }, {})
+  const byPage = await getAllContentBlocksGrouped()
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">

@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client"
 import { hashPassword } from "../src/server/auth/password"
+import { DEFAULT_CONTENT_BLOCKS } from "../src/server/services/content"
 
 const prisma = new PrismaClient()
 
@@ -58,55 +59,6 @@ const categories: Array<{
 
 const negotiatorNames = ["Amara Chen", "Diego Alvarez", "Priya Nair"]
 
-const contentBlocks: Array<{
-  page: string
-  key: string
-  adminLabel: string
-  type: "TEXT" | "IMAGE" | "VIDEO"
-  textValue?: string
-  displayOrder: number
-}> = [
-  {
-    page: "landing",
-    key: "hero.media",
-    adminLabel: "Hero panel image or video",
-    type: "IMAGE",
-    displayOrder: 0,
-  },
-  {
-    page: "landing",
-    key: "hero.status.label",
-    adminLabel: "Hero status pill",
-    type: "TEXT",
-    textValue: "In progress",
-    displayOrder: 1,
-  },
-  {
-    page: "landing",
-    key: "hero.status.headline",
-    adminLabel: "Hero status headline",
-    type: "TEXT",
-    textValue: "We're negotiating with the business now",
-    displayOrder: 2,
-  },
-  {
-    page: "landing",
-    key: "hero.negotiator.label",
-    adminLabel: "Hero negotiator card label",
-    type: "TEXT",
-    textValue: "Your Negotiator",
-    displayOrder: 3,
-  },
-  {
-    page: "landing",
-    key: "hero.negotiator.name",
-    adminLabel: "Hero negotiator card name",
-    type: "TEXT",
-    textValue: "Amara is on it",
-    displayOrder: 4,
-  },
-]
-
 async function main() {
   for (const [index, category] of categories.entries()) {
     await prisma.category.upsert({
@@ -130,22 +82,21 @@ async function main() {
     })
   }
 
-  for (const block of contentBlocks) {
-    await prisma.contentBlock.upsert({
-      where: { page_key: { page: block.page, key: block.key } },
-      // Never overwrite an admin's edit on re-seed — only fills in rows
-      // that don't exist yet.
-      update: {},
-      create: {
-        page: block.page,
-        key: block.key,
-        adminLabel: block.adminLabel,
-        type: block.type,
-        textValue: block.textValue,
-        displayOrder: block.displayOrder,
-      },
-    })
-  }
+  // Same defaults getContentBlocksByPage/getAllContentBlocksGrouped
+  // self-heal with on every read in any environment — seeding them here
+  // too just means a fresh local dev DB has them immediately rather than
+  // on first page load. skipDuplicates: never overwrites an admin's edit.
+  await prisma.contentBlock.createMany({
+    data: DEFAULT_CONTENT_BLOCKS.map((b) => ({
+      page: b.page,
+      key: b.key,
+      adminLabel: b.adminLabel,
+      type: b.type,
+      textValue: b.textValue,
+      displayOrder: b.displayOrder,
+    })),
+    skipDuplicates: true,
+  })
 
   const adminEmail = "admin@example.com"
   const adminExisting = await prisma.user.findUnique({ where: { email: adminEmail } })
