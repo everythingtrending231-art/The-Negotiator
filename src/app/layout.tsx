@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { Archivo, Lora } from "next/font/google"
+import { MotionConfig } from "framer-motion"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
@@ -40,8 +41,15 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${archivo.variable} ${lora.variable}`}>
       <body>
-        {children}
-        <Toaster position="top-right" richColors closeButton />
+        {/* reducedMotion="user": every framer-motion animation in the app
+            automatically respects the OS-level prefers-reduced-motion
+            setting (transform/layout animations snap to their end state
+            instead of animating) — a single global gate instead of a
+            useReducedMotion() check in every animated file. */}
+        <MotionConfig reducedMotion="user">
+          {children}
+          <Toaster position="top-right" richColors closeButton />
+        </MotionConfig>
       </body>
     </html>
   )

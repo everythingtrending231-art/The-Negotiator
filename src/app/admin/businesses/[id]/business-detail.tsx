@@ -258,8 +258,12 @@ export default function BusinessDetail(props: {
               <div className="space-y-1">
                 {props.allCategories.map((c) => (
                   <div key={c.id} className="flex items-center gap-2">
-                    <Checkbox checked={categoryIds.includes(c.id)} onCheckedChange={() => toggleCategory(c.id)} />
-                    <Label>{c.name}</Label>
+                    <Checkbox
+                      id={`business-category-${c.id}`}
+                      checked={categoryIds.includes(c.id)}
+                      onCheckedChange={() => toggleCategory(c.id)}
+                    />
+                    <Label htmlFor={`business-category-${c.id}`}>{c.name}</Label>
                   </div>
                 ))}
               </div>
@@ -314,7 +318,7 @@ export default function BusinessDetail(props: {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-bold">
-                      {c.name} {c.isPrimary && <span className="text-xs text-amber-600">(primary)</span>}
+                      {c.name} {c.isPrimary && <span className="text-xs text-amber-800">(primary)</span>}
                     </p>
                     <p className="text-xs text-ink-muted">{[c.email, c.phone].filter(Boolean).join(" · ")}</p>
                   </div>

@@ -53,6 +53,15 @@ module.exports = {
           700: "#0D2E7D",
           900: "#081D52",
         },
+        // Raw amber-500/600/700 (#F5A623/#D98A0F/#A8690A) all fail WCAG AA
+        // as a text color directly on light surfaces (cream/white) —
+        // 500 is ~1.9:1, 600 ~2.8:1, 700 ~4.1:1 on cream, all under the
+        // 4.5:1 normal-text threshold. Fine for fills/borders/badge
+        // backgrounds. For amber text on a light surface, use amber-800
+        // (~5.5:1, passes) or pair amber-700 text with an amber-50
+        // background chip (passes at ~4.8:1, the Badge "amber" variant
+        // in src/components/ui/badge.tsx). Amber text on the dark ink
+        // surface passes at any of these shades.
         amber: {
           50: "#FEF6E9",
           100: "#FCE7BE",
@@ -60,6 +69,7 @@ module.exports = {
           500: "#F5A623",
           600: "#D98A0F",
           700: "#A8690A",
+          800: "#8C570A",
         },
         cream: {
           DEFAULT: "#F7F5F0",

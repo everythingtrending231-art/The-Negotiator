@@ -73,6 +73,24 @@
   }
 }
 
+/* CSS-level fallback for users whose OS/browser reports a reduced-motion
+   preference outside of any framer-motion useReducedMotion() check —
+   collapses transitions/animations/smooth-scroll to near-instant rather
+   than relying solely on JS-side gating. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

@@ -54,7 +54,7 @@ export default async function BusinessCaseDetailPage({ params }: { params: Promi
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-amber-600">{negotiationCase.publicRef}</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-800">{negotiationCase.publicRef}</p>
           <h1 className="text-2xl font-black text-cobalt-600">{negotiationCase.category.name}</h1>
         </div>
         <StatusBadge status={negotiationCase.status} />
