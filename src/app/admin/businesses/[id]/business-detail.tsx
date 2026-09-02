@@ -72,11 +72,15 @@ export default function BusinessDetail(props: {
   const router = useRouter()
   const b = props.business
 
+  const [name, setName] = useState(b.name)
   const [description, setDescription] = useState(b.description ?? "")
   const [categoryIds, setCategoryIds] = useState<string[]>(b.categoryIds)
   const [verificationStatus, setVerificationStatus] = useState(b.verificationStatus)
   const [reasonCode, setReasonCode] = useState("")
   const [busy, setBusy] = useState(false)
+
+  const [deleteReason, setDeleteReason] = useState("")
+  const hasHistory = props.performance.casesInvolvedCount > 0 || props.performance.offersCount > 0
 
   const [contactName, setContactName] = useState("")
   const [contactEmail, setContactEmail] = useState("")
@@ -93,17 +97,19 @@ export default function BusinessDetail(props: {
 
   const publishConfirm = useConfirmDialog()
   const verificationConfirm = useConfirmDialog()
+  const deleteConfirm = useConfirmDialog()
 
   function toggleCategory(id: string) {
     setCategoryIds((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]))
   }
 
   async function saveProfile() {
+    if (!name.trim()) return
     setBusy(true)
     const res = await fetch(`/api/admin/businesses/${b.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ description, categoryIds }),
+      body: JSON.stringify({ name, description, categoryIds }),
     })
     setBusy(false)
     if (!res.ok) {
@@ -112,6 +118,24 @@ export default function BusinessDetail(props: {
     }
     toast.success("Profile saved.")
     router.refresh()
+  }
+
+  async function deleteBusinessNow() {
+    setBusy(true)
+    const res = await fetch(`/api/admin/businesses/${b.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: deleteReason }),
+    })
+    setBusy(false)
+    deleteConfirm.setOpen(false)
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      toast.error(body?.error ?? "Couldn't delete this business.")
+      return
+    }
+    toast.success("Business deleted.")
+    router.push("/admin/businesses")
   }
 
   async function applyVerification() {
@@ -247,8 +271,12 @@ export default function BusinessDetail(props: {
           <TabsTrigger value="notes">Notes &amp; audit</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile">
+        <TabsContent value="profile" className="space-y-6">
           <Card className="p-6 space-y-4">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
             <div className="space-y-2">
               <Label>Description</Label>
               <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
@@ -269,9 +297,42 @@ export default function BusinessDetail(props: {
               </div>
             </div>
             {b.relationshipOwnerName && <p className="text-sm text-ink-muted">Owner: {b.relationshipOwnerName}</p>}
-            <Button size="sm" disabled={busy} onClick={saveProfile}>
+            <Button size="sm" disabled={busy || !name.trim()} onClick={saveProfile}>
               Save
             </Button>
+          </Card>
+
+          <Card className="p-6 space-y-3 border-l-4 border-l-rose-500">
+            <h2 className="font-bold text-rose-700">Danger zone</h2>
+            {hasHistory ? (
+              <p className="text-sm text-ink-muted">
+                This business has negotiation history ({props.performance.casesInvolvedCount} case
+                {props.performance.casesInvolvedCount === 1 ? "" : "s"}, {props.performance.offersCount} offer
+                {props.performance.offersCount === 1 ? "" : "s"}) and can&apos;t be deleted — use the Terminate
+                verification status instead.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-ink-muted">
+                  Permanently deletes this business and its contacts, notes, and agreements. A reason is required and
+                  recorded in the audit log.
+                </p>
+                <Textarea
+                  rows={2}
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  placeholder="Reason for deletion (required, for internal audit)"
+                />
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={busy || !deleteReason.trim()}
+                  onClick={() => deleteConfirm.setOpen(true)}
+                >
+                  Delete business
+                </Button>
+              </>
+            )}
           </Card>
         </TabsContent>
 
@@ -473,6 +534,16 @@ export default function BusinessDetail(props: {
         destructive={verificationStatus === "SUSPENDED" || verificationStatus === "TERMINATED"}
         busy={busy}
         onConfirm={applyVerification}
+      />
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        onOpenChange={deleteConfirm.setOpen}
+        title="Delete this business?"
+        description={`"${b.name}" and its contacts, notes, and agreements will be permanently deleted. This cannot be undone. Reason: ${deleteReason}`}
+        confirmLabel="Delete"
+        destructive
+        busy={busy}
+        onConfirm={deleteBusinessNow}
       />
     </div>
   )
