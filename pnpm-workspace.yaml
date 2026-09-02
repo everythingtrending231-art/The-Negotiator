@@ -3,3 +3,13 @@ allowBuilds:
   '@swc/core': false
   lmdb: false
   msgpackr-extract: false
+
+# Moved from package.json#pnpm.onlyBuiltDependencies — Vercel's build now
+# resolves a newer pnpm major that no longer reads that package.json field
+# (silently ignored it, then hard-failed with ERR_PNPM_IGNORED_BUILDS on
+# `pnpm install`). This is pnpm's current location for the setting.
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - esbuild
+  - prisma
