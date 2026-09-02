@@ -57,6 +57,7 @@ model User {
   ownedBusinesses          Business[]         @relation("BusinessRelationshipOwner")
   businessNotes            BusinessNote[]
   createdPartnerAgreements PartnerAgreement[] @relation("PartnerAgreementCreatedBy")
+  updatedContentBlocks     ContentBlock[]     @relation("ContentBlockUpdatedBy")
 }
 
 // ---------------------------------------------------------------------------
@@ -586,4 +587,54 @@ model EmailLog {
   dataJson       Json
   providerStatus String // sent | logged_only | send_failed
   sentAt         DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Page-content CMS. New, undocumented scope — not specified anywhere in
+// docs/00-22, not a docs/21_OPEN_DECISIONS.md TBD, not named in any
+// docs/15_LAUNCH_ROADMAP.md phase. Built at the user's direct request rather
+// than resolving an existing doc gap. Deliberately generic (page + key, not
+// dedicated tables per field) so the same model covers every future
+// editable block across every page, not just the landing hero it starts with.
+// ---------------------------------------------------------------------------
+
+enum ContentBlockType {
+  TEXT
+  IMAGE
+  VIDEO
+}
+
+model ContentBlock {
+  id String @id @default(cuid())
+
+  // Grouping, e.g. "landing" — free text, not an enum, so a new page never
+  // needs a migration just to add a group label.
+  page String
+  // Stable identifier within a page, e.g. "hero.media", "hero.status.label".
+  // Uniqueness is scoped to (page, key), not global.
+  key  String
+
+  adminLabel String? // friendly label for the admin UI; falls back to `key`
+
+  type ContentBlockType
+
+  textValue String? // TEXT blocks
+
+  // IMAGE/VIDEO blocks — same "just store the URL" convention as
+  // Business.logoUrl. Null mediaUrl means nothing has been uploaded yet;
+  // the frontend falls back to a hardcoded default in that case.
+  mediaUrl       String?
+  mediaMimeType  String?
+  mediaSizeBytes Int?
+
+  displayOrder Int @default(0)
+
+  updatedBy     String?
+  updatedByUser User?   @relation("ContentBlockUpdatedBy", fields: [updatedBy], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([page, key])
+  @@index([page])
 }

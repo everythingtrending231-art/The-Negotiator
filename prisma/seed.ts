@@ -58,6 +58,55 @@ const categories: Array<{
 
 const negotiatorNames = ["Amara Chen", "Diego Alvarez", "Priya Nair"]
 
+const contentBlocks: Array<{
+  page: string
+  key: string
+  adminLabel: string
+  type: "TEXT" | "IMAGE" | "VIDEO"
+  textValue?: string
+  displayOrder: number
+}> = [
+  {
+    page: "landing",
+    key: "hero.media",
+    adminLabel: "Hero panel image or video",
+    type: "IMAGE",
+    displayOrder: 0,
+  },
+  {
+    page: "landing",
+    key: "hero.status.label",
+    adminLabel: "Hero status pill",
+    type: "TEXT",
+    textValue: "In progress",
+    displayOrder: 1,
+  },
+  {
+    page: "landing",
+    key: "hero.status.headline",
+    adminLabel: "Hero status headline",
+    type: "TEXT",
+    textValue: "We're negotiating with the business now",
+    displayOrder: 2,
+  },
+  {
+    page: "landing",
+    key: "hero.negotiator.label",
+    adminLabel: "Hero negotiator card label",
+    type: "TEXT",
+    textValue: "Your Negotiator",
+    displayOrder: 3,
+  },
+  {
+    page: "landing",
+    key: "hero.negotiator.name",
+    adminLabel: "Hero negotiator card name",
+    type: "TEXT",
+    textValue: "Amara is on it",
+    displayOrder: 4,
+  },
+]
+
 async function main() {
   for (const [index, category] of categories.entries()) {
     await prisma.category.upsert({
@@ -77,6 +126,23 @@ async function main() {
             displayOrder: fieldIndex,
           })),
         },
+      },
+    })
+  }
+
+  for (const block of contentBlocks) {
+    await prisma.contentBlock.upsert({
+      where: { page_key: { page: block.page, key: block.key } },
+      // Never overwrite an admin's edit on re-seed — only fills in rows
+      // that don't exist yet.
+      update: {},
+      create: {
+        page: block.page,
+        key: block.key,
+        adminLabel: block.adminLabel,
+        type: block.type,
+        textValue: block.textValue,
+        displayOrder: block.displayOrder,
       },
     })
   }
