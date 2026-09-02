@@ -103,7 +103,13 @@ function MediaBlockRow({ block }: { block: Block }) {
 
     setUploading(true)
     try {
-      const blob = await upload(file.name, file, {
+      // The raw filename (spaces, unicode, etc.) becomes the blob pathname —
+      // sanitize it rather than trusting whatever the OS file picker handed
+      // back. Prefixed with the block id so a re-upload never collides with
+      // a stale path from a previous file.
+      const extension = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : ""
+      const pathname = `content/${block.id}${extension.toLowerCase()}`
+      const blob = await upload(pathname, file, {
         access: "public",
         handleUploadUrl: "/api/admin/content/upload",
         clientPayload: block.id,

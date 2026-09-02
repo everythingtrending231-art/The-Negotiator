@@ -1,13 +1,95 @@
+import type { ContentBlockType } from "@prisma/client"
 import { prisma } from "@/server/db"
 import { recordAudit } from "@/server/audit"
 
 type Actor = { id: string }
 
+type DefaultContentBlock = {
+  page: string
+  key: string
+  adminLabel: string
+  type: ContentBlockType
+  textValue?: string
+  displayOrder: number
+}
+
+// Single source of truth for this app's known content blocks — used both
+// to self-heal a database that's missing them (see ensureDefaultContentBlocks
+// below) and by prisma/seed.ts for local dev.
+export const DEFAULT_CONTENT_BLOCKS: DefaultContentBlock[] = [
+  { page: "landing", key: "hero.media", adminLabel: "Hero panel image or video", type: "IMAGE", displayOrder: 0 },
+  {
+    page: "landing",
+    key: "hero.status.label",
+    adminLabel: "Hero status pill",
+    type: "TEXT",
+    textValue: "In progress",
+    displayOrder: 1,
+  },
+  {
+    page: "landing",
+    key: "hero.status.headline",
+    adminLabel: "Hero status headline",
+    type: "TEXT",
+    textValue: "We're negotiating with the business now",
+    displayOrder: 2,
+  },
+  {
+    page: "landing",
+    key: "hero.negotiator.label",
+    adminLabel: "Hero negotiator card label",
+    type: "TEXT",
+    textValue: "Your Negotiator",
+    displayOrder: 3,
+  },
+  {
+    page: "landing",
+    key: "hero.negotiator.name",
+    adminLabel: "Hero negotiator card name",
+    type: "TEXT",
+    textValue: "Amara is on it",
+    displayOrder: 4,
+  },
+]
+
+// Self-heals a database that only ever ran migrations and never the
+// dev-only seed script — exactly what happens in production, where
+// `prisma migrate deploy` creates the table but prisma/seed.ts never runs
+// there (it also creates dev login accounts with well-known passwords,
+// which must never touch production). Safe to call on every read:
+// skipDuplicates makes it a no-op once rows exist, and it never touches a
+// block an admin has since edited.
+async function ensureDefaultContentBlocks() {
+  await prisma.contentBlock.createMany({
+    data: DEFAULT_CONTENT_BLOCKS.map((b) => ({
+      page: b.page,
+      key: b.key,
+      adminLabel: b.adminLabel,
+      type: b.type,
+      textValue: b.textValue,
+      displayOrder: b.displayOrder,
+    })),
+    skipDuplicates: true,
+  })
+}
+
 export async function getContentBlocksByPage(page: string) {
+  await ensureDefaultContentBlocks()
   return prisma.contentBlock.findMany({
     where: { page },
     orderBy: { displayOrder: "asc" },
   })
+}
+
+export async function getAllContentBlocksGrouped() {
+  await ensureDefaultContentBlocks()
+  const blocks = await prisma.contentBlock.findMany({
+    orderBy: [{ page: "asc" }, { displayOrder: "asc" }],
+  })
+  return blocks.reduce<Record<string, typeof blocks>>((acc, b) => {
+    ;(acc[b.page] ??= []).push(b)
+    return acc
+  }, {})
 }
 
 export async function updateContentText(id: string, textValue: string, actor: Actor) {
