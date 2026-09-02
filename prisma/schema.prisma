@@ -158,7 +158,8 @@ model Business {
   notes             BusinessNote[]
   partnerAgreements PartnerAgreement[]
   offers            Offer[]
-  cases             NegotiationCase[]
+  cases             NegotiationCase[] @relation("NegotiationCaseBusiness")
+  preferredByCases  NegotiationCase[] @relation("NegotiationCaseCustomerPreferredBusiness")
   invites           CaseBusinessInvite[]
 }
 
@@ -295,8 +296,19 @@ model NegotiationCase {
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
 
+  // The business a case is actually locked to — set by a Negotiator via
+  // offers.ts::createOffer, and load-bearing from that point on (Business
+  // Portal access, confirm/request-changes gating). Never set at intake.
   businessId String?
-  business   Business? @relation(fields: [businessId], references: [id])
+  business   Business? @relation("NegotiationCaseBusiness", fields: [businessId], references: [id])
+
+  // The customer's optional, non-binding hint at submission time — "Business
+  // or seller, if known" per docs/03_CUSTOMER_JOURNEY.md §3. Deliberately a
+  // separate field from businessId above: this is informational only and
+  // must never itself grant Business Portal access or gate anything — only
+  // a Negotiator-created Offer (via businessId) does that.
+  customerPreferredBusinessId String?
+  customerPreferredBusiness   Business? @relation("NegotiationCaseCustomerPreferredBusiness", fields: [customerPreferredBusinessId], references: [id])
 
   assignedNegotiatorId String?
   assignedNegotiator   Negotiator? @relation(fields: [assignedNegotiatorId], references: [id])
