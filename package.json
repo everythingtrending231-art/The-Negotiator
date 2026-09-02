@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "pnpm@10.28.0",
   "scripts": {
     "dev": "next dev",
     "build": "prisma migrate deploy && next build",
@@ -80,12 +81,5 @@
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.23.13",
     "typescript": "~6.0.2"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "prisma"
-    ]
   }
 }
