@@ -22,9 +22,9 @@ export default async function AdminAnalyticsPage() {
       <div>
         <h1 className="text-2xl font-black text-cobalt-600">Analytics</h1>
         <p className="text-sm text-ink-muted">
-          Basic metrics per docs/16 — only what&apos;s honestly computable from real case/offer data today. No
-          revenue/financial figures (need Phase 3 payment data) or satisfaction/complaint metrics (never
-          tracked).
+          Basic metrics per docs/16 — only what&apos;s honestly computable from real case/offer data today. Deal
+          value below is not revenue — no fee/pricing model exists yet (every payment mechanic is marked TBD in
+          docs/21_OPEN_DECISIONS.md). No satisfaction/complaint metrics either (never tracked).
         </p>
       </div>
 
@@ -59,6 +59,22 @@ export default async function AdminAnalyticsPage() {
           <StatTile label="Active partners" value={String(a.activePartners)} />
           <StatTile label="Avg. business confirmation time" value={formatHours(a.avgBusinessConfirmationHours)} />
           <StatTile label="Dispute rate" value={formatPercent(a.disputeRate)} />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-bold text-ink-muted uppercase tracking-wide">Deals</h2>
+        <p className="text-xs text-ink-muted">
+          The total value of offers customers accepted — not what The Negotiator earns. No fee model exists yet,
+          so there&apos;s nothing to report as revenue.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <StatTile label="Closed deals" value={String(a.closedDealsCount)} />
+          <StatTile label="Total deal value" value={formatCents(a.totalDealValueCents, "USD")} />
+          <StatTile
+            label="Avg. deal value"
+            value={a.avgDealValueCents == null ? "—" : formatCents(a.avgDealValueCents, "USD")}
+          />
         </div>
       </section>
 

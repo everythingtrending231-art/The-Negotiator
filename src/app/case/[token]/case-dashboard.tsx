@@ -152,10 +152,21 @@ export default function CaseDashboard(props: {
   const [reply, setReply] = useState("")
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  // ACCEPTED/DECLINED are terminal — the same transaction that records the
+  // decision also revokes this ticket's access tokens (docs/03 §10.1: post-
+  // closure access is never self-service). Refetching via router.refresh()
+  // after either would hit the now-revoked token and strand the customer on
+  // ExpiredLinkCard right after their own action. Track the decision locally
+  // instead and render the confirmation from data already on the page —
+  // REQUESTED_ANOTHER_ROUND isn't terminal, so that path still refreshes.
+  const [confirmedDecision, setConfirmedDecision] = useState<"ACCEPTED" | "DECLINED" | null>(null)
 
-  const isTerminal = TERMINAL_STATUSES.includes(props.status)
-  const canDecide = props.offer && !props.offer.customerDecision && !isTerminal
-  const { headline, stage } = statusInfo(props.status)
+  const effectiveStatus = confirmedDecision ?? props.status
+  const effectiveOffer = props.offer ? { ...props.offer, customerDecision: confirmedDecision ?? props.offer.customerDecision } : null
+
+  const isTerminal = TERMINAL_STATUSES.includes(effectiveStatus)
+  const canDecide = effectiveOffer && !effectiveOffer.customerDecision && !isTerminal
+  const { headline, stage } = statusInfo(effectiveStatus)
 
   async function sendReply() {
     if (!reply.trim()) return
@@ -185,7 +196,11 @@ export default function CaseDashboard(props: {
       setNotice(body?.error ?? "Something went wrong.")
       return
     }
-    router.refresh()
+    if (decision === "ACCEPTED" || decision === "DECLINED") {
+      setConfirmedDecision(decision)
+    } else {
+      router.refresh()
+    }
   }
 
   async function resend() {
@@ -239,60 +254,64 @@ export default function CaseDashboard(props: {
           </div>
         </motion.div>
 
-        {props.offer && (
+        {effectiveOffer && (
           <motion.div
             variants={{ hidden: { opacity: 0, y: 16, scale: 0.98 }, show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } } }}
             className="bg-cobalt-600 rounded-panel shadow-panel p-6 sm:p-8 text-white"
           >
             <p className="text-xs font-bold uppercase tracking-wide text-amber-400 mb-2">
-              {props.offer.customerDecision ? "Offer" : "Your offer is ready"}
+              {effectiveOffer.customerDecision === "ACCEPTED"
+                ? "Deal confirmed"
+                : effectiveOffer.customerDecision
+                  ? "Offer"
+                  : "Your offer is ready"}
             </p>
             <p className="font-black text-4xl sm:text-5xl mb-4 tracking-tight tabular-nums">
-              {formatCents(priceValue, props.offer.currency)}
+              {formatCents(priceValue, effectiveOffer.currency)}
             </p>
 
             <div className="space-y-3 text-sm border-t border-white/15 pt-4">
               <div>
                 <p className="text-white/50 text-xs font-bold uppercase tracking-wide mb-0.5">What&apos;s included</p>
-                <p className="text-white/95">{props.offer.includedGoods}</p>
+                <p className="text-white/95">{effectiveOffer.includedGoods}</p>
               </div>
-              {props.offer.additionalBenefits && (
+              {effectiveOffer.additionalBenefits && (
                 <div>
                   <p className="text-white/50 text-xs font-bold uppercase tracking-wide mb-0.5">Also included</p>
-                  <p className="text-white/95">{props.offer.additionalBenefits}</p>
+                  <p className="text-white/95">{effectiveOffer.additionalBenefits}</p>
                 </div>
               )}
-              {props.offer.conditions && (
+              {effectiveOffer.conditions && (
                 <div>
                   <p className="text-white/50 text-xs font-bold uppercase tracking-wide mb-0.5">Conditions</p>
-                  <p className="text-white/95">{props.offer.conditions}</p>
+                  <p className="text-white/95">{effectiveOffer.conditions}</p>
                 </div>
               )}
-              {(props.offer.paymentTerms || props.offer.deliveryTerms) && (
+              {(effectiveOffer.paymentTerms || effectiveOffer.deliveryTerms) && (
                 <div className="grid grid-cols-2 gap-3">
-                  {props.offer.paymentTerms && (
+                  {effectiveOffer.paymentTerms && (
                     <div>
                       <p className="text-white/50 text-xs font-bold uppercase tracking-wide mb-0.5">Payment</p>
-                      <p className="text-white/95">{props.offer.paymentTerms}</p>
+                      <p className="text-white/95">{effectiveOffer.paymentTerms}</p>
                     </div>
                   )}
-                  {props.offer.deliveryTerms && (
+                  {effectiveOffer.deliveryTerms && (
                     <div>
                       <p className="text-white/50 text-xs font-bold uppercase tracking-wide mb-0.5">Delivery</p>
-                      <p className="text-white/95">{props.offer.deliveryTerms}</p>
+                      <p className="text-white/95">{effectiveOffer.deliveryTerms}</p>
                     </div>
                   )}
                 </div>
               )}
-              {props.offer.businessName && (
+              {effectiveOffer.businessName && (
                 <div>
                   <p className="text-white/50 text-xs font-bold uppercase tracking-wide mb-0.5">Business</p>
-                  <p className="text-white/95">{props.offer.businessName}</p>
+                  <p className="text-white/95">{effectiveOffer.businessName}</p>
                 </div>
               )}
-              {props.offer.validUntil && (
+              {effectiveOffer.validUntil && (
                 <p className="text-white/60 text-xs pt-1">
-                  Valid until {new Date(props.offer.validUntil).toLocaleString()}
+                  Valid until {new Date(effectiveOffer.validUntil).toLocaleString()}
                 </p>
               )}
             </div>
@@ -330,9 +349,9 @@ export default function CaseDashboard(props: {
                 </motion.div>
               </div>
             ) : (
-              props.offer.customerDecision && (
+              effectiveOffer.customerDecision && (
                 <p className="text-sm font-bold text-white/80 pt-4 mt-2 border-t border-white/15">
-                  You: {formatStatus(props.offer.customerDecision)}
+                  You: {formatStatus(effectiveOffer.customerDecision)}
                 </p>
               )
             )}

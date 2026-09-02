@@ -91,6 +91,21 @@ export async function getPlatformAnalytics() {
     confirmedOffers.map((o) => hoursBetween(o.createdAt, o.businessConfirmedAt!)),
   )
 
+  // Phase 3 scaffolding: deal-VALUE reporting, not revenue — no fee/pricing
+  // model exists yet (docs/21_OPEN_DECISIONS.md has every payment mechanic
+  // marked TBD, per CLAUDE.md rule 6). This is the total/average size of
+  // offers customers accepted, nothing about what the platform earns.
+  // Assumes a single implicit currency across offers, same simplification
+  // avgPriceImprovementCents above already makes. acceptedOffers (the
+  // count fetched above) is reused directly as closedDealsCount.
+  const acceptedOfferValues = await prisma.offer.findMany({
+    where: { customerDecision: "ACCEPTED" },
+    select: { finalPriceCents: true },
+  })
+  const closedDealsCount = acceptedOffers
+  const totalDealValueCents = acceptedOfferValues.reduce((sum, o) => sum + o.finalPriceCents, 0)
+  const avgDealValueCents = closedDealsCount > 0 ? totalDealValueCents / closedDealsCount : null
+
   return {
     requestsSubmitted,
     requestsQualified,
@@ -105,6 +120,9 @@ export async function getPlatformAnalytics() {
     activePartners,
     avgBusinessConfirmationHours,
     disputeRate: requestsSubmitted > 0 ? disputedCases / requestsSubmitted : null,
+    closedDealsCount,
+    totalDealValueCents,
+    avgDealValueCents,
   }
 }
 
