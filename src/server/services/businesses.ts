@@ -98,6 +98,43 @@ export async function updateBusinessProfile(id: string, input: UpdateBusinessPro
   })
 }
 
+// Hard delete, gated on having no negotiation history. Offer.businessId is
+// required and NegotiationCase.businessId has no onDelete rule, so Postgres
+// would reject the delete with a raw FK violation once either exists —
+// this check exists to give the admin a clear reason instead of a Prisma
+// P2003 error, and to steer them toward the existing TERMINATED
+// verification status (which already exists for "this partnership is
+// over" without destroying the case/offer records that reference it).
+// Everything else on Business (categories, contacts, notes, agreements,
+// invites) cascades at the schema level.
+export async function deleteBusiness(id: string, reason: string, actor: Actor) {
+  const existing = await prisma.business.findUniqueOrThrow({ where: { id } })
+
+  const [caseCount, offerCount] = await Promise.all([
+    prisma.negotiationCase.count({ where: { businessId: id } }),
+    prisma.offer.count({ where: { businessId: id } }),
+  ])
+  if (caseCount > 0 || offerCount > 0) {
+    throw new Error(
+      "This business has negotiation history (cases or offers) and can't be deleted — use the Terminate verification status instead.",
+    )
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await recordAudit(tx, {
+      actorType: "ADMIN",
+      actorId: actor.id,
+      action: "BUSINESS_DELETED",
+      relatedEntityType: "Business",
+      relatedEntityId: id,
+      before: { name: existing.name },
+      after: { reason },
+      sourceChannel: "internal",
+    })
+    await tx.business.delete({ where: { id } })
+  })
+}
+
 // Any-to-any transition, no enforced state machine — matches the existing
 // setCaseStatus precedent (docs/22 doesn't specify transition rules).
 export async function setBusinessVerificationStatus(
