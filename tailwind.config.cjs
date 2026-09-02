@@ -134,6 +134,13 @@ module.exports = {
           "70%": { boxShadow: "0 0 0 8px rgba(245,166,35,0)" },
           "100%": { boxShadow: "0 0 0 0 rgba(245,166,35,0)" },
         },
+        // Same "look here" ring-pulse language as pulse-ring, sized for a
+        // full CTA button rather than a small badge.
+        "cta-pulse": {
+          "0%": { boxShadow: "0 0 0 0 rgba(245,166,35,0.45)" },
+          "70%": { boxShadow: "0 0 0 14px rgba(245,166,35,0)" },
+          "100%": { boxShadow: "0 0 0 0 rgba(245,166,35,0)" },
+        },
         "draw-line": {
           from: { strokeDashoffset: "1" },
           to: { strokeDashoffset: "0" },
@@ -146,6 +153,7 @@ module.exports = {
         "fade-in": "fade-in 0.5s ease-out both",
         "scale-in": "scale-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both",
         "pulse-ring": "pulse-ring 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "cta-pulse": "cta-pulse 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
       },
       transitionTimingFunction: {
         confident: "cubic-bezier(0.16, 1, 0.3, 1)",
