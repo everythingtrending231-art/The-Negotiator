@@ -1,7 +1,7 @@
 import type { Role } from "@prisma/client"
 import { prisma } from "@/server/db"
 import { recordAudit } from "@/server/audit"
-import { hashPassword } from "@/server/auth/password"
+import { hashPassword, verifyPassword } from "@/server/auth/password"
 
 export class ForbiddenError extends Error {}
 
@@ -141,6 +141,34 @@ export async function grantBusinessContactAccess(contactId: string, password: st
     })
 
     return user
+  })
+}
+
+export class InvalidCurrentPasswordError extends Error {}
+
+// Self-service counterpart to setUserPassword below — that one is
+// Admin-actor-gated (assertCanManageRole) for resetting *someone else's*
+// password; this one lets any signed-in user (Negotiator/Business/Admin)
+// change their own, and unlike the admin path requires proving the
+// current password first rather than trusting the caller's session alone.
+export async function setOwnPassword(userId: string, currentPassword: string, newPassword: string) {
+  const existing = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
+  const valid = await verifyPassword(currentPassword, existing.passwordHash)
+  if (!valid) {
+    throw new InvalidCurrentPasswordError("Current password is incorrect.")
+  }
+  const passwordHash = await hashPassword(newPassword)
+
+  return prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: userId }, data: { passwordHash } })
+    await recordAudit(tx, {
+      actorType: existing.role === "NEGOTIATOR" ? "NEGOTIATOR" : existing.role === "BUSINESS" ? "BUSINESS" : "ADMIN",
+      actorId: userId,
+      action: "USER_PASSWORD_RESET",
+      relatedEntityType: "User",
+      relatedEntityId: userId,
+      sourceChannel: "internal",
+    })
   })
 }
 

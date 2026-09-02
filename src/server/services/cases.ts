@@ -245,6 +245,53 @@ export async function setCaseStatus(caseId: string, newStatus: CaseStatus, negot
   return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
 }
 
+// Manual negotiator-flagged escalation — see the schema comment on
+// NegotiationCase.escalated for why this is a plain flag rather than any
+// automated/threshold-driven mechanism.
+export async function escalateCase(caseId: string, reason: string, negotiatorId: string) {
+  const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+
+  await prisma.$transaction(async (tx) => {
+    await tx.negotiationCase.update({
+      where: { id: caseId },
+      data: { escalated: true, escalatedAt: new Date(), escalatedReason: reason },
+    })
+    await recordAudit(tx, {
+      actorType: "NEGOTIATOR",
+      actorId: negotiatorId,
+      caseId,
+      action: "CASE_ESCALATED",
+      before: { escalated: existing.escalated },
+      after: { escalated: true, escalatedReason: reason },
+      sourceChannel: "internal",
+    })
+  })
+
+  return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+}
+
+export async function unescalateCase(caseId: string, negotiatorId: string) {
+  const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+
+  await prisma.$transaction(async (tx) => {
+    await tx.negotiationCase.update({
+      where: { id: caseId },
+      data: { escalated: false, escalatedAt: null, escalatedReason: null },
+    })
+    await recordAudit(tx, {
+      actorType: "NEGOTIATOR",
+      actorId: negotiatorId,
+      caseId,
+      action: "CASE_UNESCALATED",
+      before: { escalated: existing.escalated, escalatedReason: existing.escalatedReason },
+      after: { escalated: false },
+      sourceChannel: "internal",
+    })
+  })
+
+  return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+}
+
 export type CustomerDecision = "ACCEPTED" | "DECLINED" | "REQUESTED_ANOTHER_ROUND"
 
 export async function recordCustomerDecision(caseId: string, offerId: string, decision: CustomerDecision) {
