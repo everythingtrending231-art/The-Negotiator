@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { motion, useReducedMotion, useScroll, useTransform, type Variants } from "framer-motion"
+import { motion, useScroll, useTransform, type Variants } from "framer-motion"
 import { useRef } from "react"
 import NegotiatorMark from "@/components/negotiator-mark"
 
@@ -79,7 +79,6 @@ const stepItem: Variants = {
 
 export default function HomePage() {
   const heroRef = useRef(null)
-  const reduceMotion = useReducedMotion()
 
   return (
     <div ref={heroRef} className="min-h-screen w-full relative overflow-hidden flex flex-col bg-cream">
@@ -137,7 +136,7 @@ export default function HomePage() {
           <motion.div variants={heroItem} className="flex flex-wrap gap-4 mb-8">
             <Link href="/request">
               <motion.span
-                animate={reduceMotion ? undefined : { scale: [1, 1.06, 1, 1.04, 1] }}
+                animate={{ scale: [1, 1.06, 1, 1.04, 1] }}
                 transition={{ duration: 1.1, repeat: Infinity, repeatDelay: 1.6, ease: "easeInOut" }}
                 whileHover={{
                   scale: 1,
@@ -198,7 +197,7 @@ export default function HomePage() {
               whileHover={{ rotate: 0, scale: 1.03 }}
               className="absolute -top-6 -left-6 sm:-left-10 bg-white rounded-2xl shadow-panel px-5 py-4 max-w-[220px] border-4 border-cream"
             >
-              <p className="text-xs font-bold uppercase tracking-wide mb-1 text-amber-600">In progress</p>
+              <p className="text-xs font-bold uppercase tracking-wide mb-1 text-amber-800">In progress</p>
               <p className="text-sm font-bold text-ink">We&apos;re negotiating with the business now</p>
             </motion.div>
 

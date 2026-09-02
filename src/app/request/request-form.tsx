@@ -112,7 +112,7 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="text-xs font-bold uppercase tracking-wide mb-2 text-amber-600"
+          className="text-xs font-bold uppercase tracking-wide mb-2 text-amber-800"
         >
           Request sent
         </motion.p>
@@ -179,7 +179,7 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
         className="bg-white rounded-panel shadow-panel p-6 sm:p-9 space-y-7"
       >
         <div className="space-y-5">
-          <p className="text-xs font-bold uppercase tracking-wide text-amber-600">Required</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-800">Required</p>
 
           <FormField
             control={form.control}

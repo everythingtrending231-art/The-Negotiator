@@ -115,7 +115,7 @@ function StatusTimeline({ stage }: { stage: Stage }) {
               <span
                 className={
                   "text-[11px] font-bold uppercase tracking-wide whitespace-nowrap " +
-                  (current ? "text-amber-600" : done ? "text-cobalt-600" : "text-ink-muted/60")
+                  (current ? "text-amber-800" : done ? "text-cobalt-600" : "text-ink-muted/60")
                 }
               >
                 {label}
@@ -213,7 +213,7 @@ export default function CaseDashboard(props: {
         >
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-1">{props.caseRef}</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-amber-800 mb-1">{props.caseRef}</p>
               <h1 className="font-black text-2xl sm:text-display-sm text-cobalt-600 leading-tight">{headline}</h1>
             </div>
           </div>

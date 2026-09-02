@@ -196,7 +196,7 @@ export default function CaseDetail(props: {
         className="flex items-center justify-between"
       >
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-amber-600">{c.publicRef}</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-800">{c.publicRef}</p>
           <h1 className="text-2xl font-black text-cobalt-600">{c.categoryName}</h1>
         </div>
         <StatusBadge status={c.status} />
@@ -372,7 +372,7 @@ export default function CaseDetail(props: {
                         {new Date(offer.businessConfirmedAt).toLocaleString()}
                       </p>
                     ) : offer.businessFeedback ? (
-                      <p className="text-amber-700 font-bold">Business requested changes: {offer.businessFeedback}</p>
+                      <p className="text-amber-800 font-bold">Business requested changes: {offer.businessFeedback}</p>
                     ) : (
                       <p className="text-ink-muted">Awaiting business confirmation</p>
                     )}

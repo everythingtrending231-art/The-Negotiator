@@ -175,8 +175,8 @@ export default function CategoryDetail(props: {
           <Input value={icon} onChange={(e) => setIcon(e.target.value)} />
         </div>
         <div className="flex items-center gap-2">
-          <Checkbox checked={customerVisible} onCheckedChange={(v) => setCustomerVisible(v === true)} />
-          <Label>Visible to customers when active</Label>
+          <Checkbox id="customerVisible" checked={customerVisible} onCheckedChange={(v) => setCustomerVisible(v === true)} />
+          <Label htmlFor="customerVisible">Visible to customers when active</Label>
         </div>
         <Button size="sm" disabled={busy} onClick={saveProfile}>
           Save
@@ -242,8 +242,8 @@ export default function CategoryDetail(props: {
             </Select>
           </div>
           <div className="flex items-center gap-2">
-            <Checkbox checked={fieldRequired} onCheckedChange={(v) => setFieldRequired(v === true)} />
-            <Label>Required</Label>
+            <Checkbox id="fieldRequired" checked={fieldRequired} onCheckedChange={(v) => setFieldRequired(v === true)} />
+            <Label htmlFor="fieldRequired">Required</Label>
           </div>
         </div>
         <Button size="sm" disabled={busy || !fieldName.trim()} onClick={addField}>
