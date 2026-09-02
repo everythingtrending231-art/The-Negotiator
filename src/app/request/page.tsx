@@ -6,7 +6,18 @@ export default async function RequestPage() {
   const categories = await prisma.category.findMany({
     where: { status: "ACTIVE", customerVisible: true },
     orderBy: { displayOrder: "asc" },
-    include: { fields: { orderBy: { displayOrder: "asc" } } },
+    include: {
+      fields: { orderBy: { displayOrder: "asc" } },
+      // Only businesses actually visible to customers — never leaks an
+      // unpublished/prospect business into this customer-facing path (see
+      // CLAUDE.md non-negotiable #3). Explicit `select` below keeps the
+      // DTO to safe, public fields only — no pricing/agreement data lives
+      // on Business anyway, but this is the enforcement point regardless.
+      businesses: {
+        where: { business: { customerVisible: true, publishStatus: "PUBLISHED" } },
+        include: { business: { select: { id: true, name: true, logoUrl: true, description: true } } },
+      },
+    },
   })
 
   return (
@@ -28,6 +39,12 @@ export default async function RequestPage() {
               fieldName: field.fieldName,
               fieldType: field.fieldType,
               required: field.required,
+            })),
+            businesses: category.businesses.map((bc) => ({
+              id: bc.business.id,
+              name: bc.business.name,
+              logoUrl: bc.business.logoUrl,
+              description: bc.business.description,
             })),
           }))}
         />

@@ -29,7 +29,8 @@ import {
 import NegotiatorMark from "@/components/negotiator-mark"
 
 type CategoryField = { id: string; fieldName: string; fieldType: string; required: boolean }
-type Category = { id: string; name: string; fields: CategoryField[] }
+type CategoryBusiness = { id: string; name: string; logoUrl: string | null; description: string | null }
+type Category = { id: string; name: string; fields: CategoryField[]; businesses: CategoryBusiness[] }
 
 const requestSchema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -221,6 +222,44 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
               </FormItem>
             )}
           />
+
+          <AnimatePresence initial={false}>
+            {selectedCategory && selectedCategory.businesses.length > 0 && (
+              <motion.div
+                key={`businesses-${selectedCategory.id}`}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-3">
+                  <p className="text-sm font-bold text-ink-muted">
+                    Businesses we work with in {selectedCategory.name}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCategory.businesses.map((business) => (
+                      <div
+                        key={business.id}
+                        title={business.description ?? undefined}
+                        className="inline-flex items-center gap-2 rounded-pill border border-border bg-white px-3 py-2"
+                      >
+                        {business.logoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={business.logoUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                        ) : (
+                          <span className="w-5 h-5 rounded-full bg-cobalt-600 text-white text-[10px] font-bold flex items-center justify-center">
+                            {business.name.charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                        <span className="text-sm font-semibold text-ink">{business.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <FormField
             control={form.control}
