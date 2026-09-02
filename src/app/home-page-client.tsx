@@ -84,6 +84,12 @@ export default function HomePageClient(props: {
   statusHeadline: string
   negotiatorLabel: string
   negotiatorName: string
+  badge: string
+  headline: string
+  subheading: string
+  ctaPrimary: string
+  ctaSecondary: string
+  valueBadges: string[]
 }) {
   const heroRef = useRef(null)
 
@@ -126,18 +132,20 @@ export default function HomePageClient(props: {
             variants={heroItem}
             className="inline-block px-4 py-1.5 rounded-pill text-xs font-bold uppercase tracking-wide mb-6 bg-amber-500 text-ink"
           >
-            #DontAcceptTheFirstOffer
+            {props.badge}
           </motion.span>
 
           <motion.h1 variants={heroItem} className="font-black text-display-lg text-cobalt-600 mb-5">
-            Don&apos;t take
-            <br />
-            the first price.
+            {props.headline.split("\n").map((line, i, arr) => (
+              <span key={i}>
+                {line}
+                {i < arr.length - 1 && <br />}
+              </span>
+            ))}
           </motion.h1>
 
           <motion.p variants={heroItem} className="text-lg leading-relaxed mb-8 text-ink-soft max-w-md">
-            Tell us what you&apos;re trying to buy, book, or get. Your Negotiator goes
-            to work on it — you decide when the offer comes back.
+            {props.subheading}
           </motion.p>
 
           <motion.div variants={heroItem} className="flex flex-wrap gap-4 mb-8">
@@ -154,7 +162,7 @@ export default function HomePageClient(props: {
                 whileTap={{ scale: 0.96, transition: { type: "spring", stiffness: 500, damping: 25 } }}
                 className="inline-flex px-7 py-4 rounded-pill font-bold text-white text-base bg-cobalt-600 shadow-card animate-cta-pulse"
               >
-                Negotiate This For Me
+                {props.ctaPrimary}
               </motion.span>
             </Link>
             <a href="#how-it-works">
@@ -164,16 +172,16 @@ export default function HomePageClient(props: {
                 transition={{ type: "spring", stiffness: 400, damping: 22 }}
                 className="inline-flex px-7 py-4 rounded-pill font-bold text-base border-2 border-cobalt-600 text-cobalt-600"
               >
-                See how it works
+                {props.ctaSecondary}
               </motion.span>
             </a>
           </motion.div>
 
           <motion.div variants={heroItem} className="flex flex-wrap gap-3">
             <motion.div variants={heroStagger} initial="hidden" animate="show" className="flex flex-wrap gap-3">
-              <ValueBadge label="Lower Price" />
-              <ValueBadge label="Better Terms" />
-              <ValueBadge label="Added Value" />
+              {props.valueBadges.map((label) => (
+                <ValueBadge key={label} label={label} />
+              ))}
             </motion.div>
           </motion.div>
         </motion.section>

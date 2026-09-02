@@ -50,6 +50,74 @@ export const DEFAULT_CONTENT_BLOCKS: DefaultContentBlock[] = [
     textValue: "Amara is on it",
     displayOrder: 4,
   },
+  {
+    page: "landing",
+    key: "hero.badge",
+    adminLabel: "Hero badge pill",
+    type: "TEXT",
+    textValue: "#DontAcceptTheFirstOffer",
+    displayOrder: 5,
+  },
+  {
+    page: "landing",
+    // Stored with a literal newline between the two display lines — the
+    // frontend splits on "\n" and renders a <br/> between segments, so an
+    // admin can control the line break without any HTML/markup risk.
+    key: "hero.headline",
+    adminLabel: "Hero headline (use a new line to control the line break)",
+    type: "TEXT",
+    textValue: "Don't take\nthe first price.",
+    displayOrder: 6,
+  },
+  {
+    page: "landing",
+    key: "hero.subheading",
+    adminLabel: "Hero subheading",
+    type: "TEXT",
+    textValue:
+      "Tell us what you're trying to buy, book, or get. Your Negotiator goes to work on it — you decide when the offer comes back.",
+    displayOrder: 7,
+  },
+  {
+    page: "landing",
+    key: "hero.cta.primary",
+    adminLabel: "Primary CTA button text",
+    type: "TEXT",
+    textValue: "Negotiate This For Me",
+    displayOrder: 8,
+  },
+  {
+    page: "landing",
+    key: "hero.cta.secondary",
+    adminLabel: "Secondary CTA button text",
+    type: "TEXT",
+    textValue: "See how it works",
+    displayOrder: 9,
+  },
+  {
+    page: "landing",
+    key: "hero.valueBadge.1",
+    adminLabel: "Value badge 1",
+    type: "TEXT",
+    textValue: "Lower Price",
+    displayOrder: 10,
+  },
+  {
+    page: "landing",
+    key: "hero.valueBadge.2",
+    adminLabel: "Value badge 2",
+    type: "TEXT",
+    textValue: "Better Terms",
+    displayOrder: 11,
+  },
+  {
+    page: "landing",
+    key: "hero.valueBadge.3",
+    adminLabel: "Value badge 3",
+    type: "TEXT",
+    textValue: "Added Value",
+    displayOrder: 12,
+  },
 ]
 
 // Self-heals a database that only ever ran migrations and never the
