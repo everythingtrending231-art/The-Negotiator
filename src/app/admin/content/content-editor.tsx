@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { upload } from "@vercel/blob/client"
+import { uploadPresigned } from "@vercel/blob/client"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -109,7 +109,7 @@ function MediaBlockRow({ block }: { block: Block }) {
       // a stale path from a previous file.
       const extension = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : ""
       const pathname = `content/${block.id}${extension.toLowerCase()}`
-      const blob = await upload(pathname, file, {
+      const blob = await uploadPresigned(pathname, file, {
         access: "public",
         handleUploadUrl: "/api/admin/content/upload",
         clientPayload: block.id,
