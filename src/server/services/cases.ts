@@ -292,6 +292,68 @@ export async function unescalateCase(caseId: string, negotiatorId: string) {
   return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
 }
 
+// Admin override: reassigns to a different Negotiator without touching
+// status — unlike assignNegotiator (a Negotiator claiming an unassigned
+// case, which also bumps SUBMITTED/UNDER_REVIEW to ASSIGNED), this can
+// move an already-in-progress case to someone else without resetting its
+// progress.
+export async function adminReassignCase(caseId: string, negotiatorId: string, adminId: string) {
+  const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+
+  await prisma.$transaction(async (tx) => {
+    await tx.negotiationCase.update({ where: { id: caseId }, data: { assignedNegotiatorId: negotiatorId } })
+    await recordAudit(tx, {
+      actorType: "ADMIN",
+      actorId: adminId,
+      caseId,
+      action: "CASE_REASSIGNED",
+      before: { assignedNegotiatorId: existing.assignedNegotiatorId },
+      after: { assignedNegotiatorId: negotiatorId },
+      sourceChannel: "internal",
+    })
+  })
+
+  return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+}
+
+// Admin override: force-closes a case regardless of its current state.
+// Reuses the same terminal-status machinery (token revocation, one-time
+// closure email) every other path into a terminal status goes through, plus
+// a distinct CASE_FORCE_CLOSED audit row (carrying the reason, if any) so
+// this reads differently from an ordinary negotiator status change.
+export async function adminForceCloseCase(caseId: string, adminId: string, reason?: string) {
+  const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+  if (isTerminal(existing.status)) {
+    throw new Error("This case is already closed.")
+  }
+
+  const { shouldSendClosureSummary } = await prisma.$transaction(async (tx) => {
+    const result = await applyStatusChangeInTx(
+      tx,
+      existing,
+      "CLOSED",
+      { actorType: "ADMIN", actorId: adminId },
+      "internal",
+    )
+    await recordAudit(tx, {
+      actorType: "ADMIN",
+      actorId: adminId,
+      caseId,
+      action: "CASE_FORCE_CLOSED",
+      before: { status: existing.status },
+      after: { status: "CLOSED", reason: reason ?? null },
+      sourceChannel: "internal",
+    })
+    return result
+  })
+
+  if (shouldSendClosureSummary) {
+    await sendClosureSummaryEmail(caseId)
+  }
+
+  return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+}
+
 export type CustomerDecision = "ACCEPTED" | "DECLINED" | "REQUESTED_ANOTHER_ROUND"
 
 export async function recordCustomerDecision(caseId: string, offerId: string, decision: CustomerDecision) {

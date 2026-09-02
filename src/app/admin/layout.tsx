@@ -10,9 +10,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       sessionLabel={`${session.name} · ${session.role}`}
       nav={[
         { label: "Analytics", href: "/admin/analytics" },
+        { label: "Cases", href: "/admin/cases" },
+        { label: "Offers", href: "/admin/offers" },
         { label: "Categories", href: "/admin/categories" },
         { label: "Businesses", href: "/admin/businesses" },
         { label: "Users", href: "/admin/users" },
+        { label: "Audit", href: "/admin/audit" },
         { label: "Dev outbox", href: "/admin/dev/outbox" },
       ]}
     >

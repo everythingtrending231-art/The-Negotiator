@@ -260,3 +260,48 @@ export async function updateOffer(caseId: string, offerId: string, input: Update
     return updated
   })
 }
+
+export type AdminUpdateOfferInput = Omit<UpdateOfferInput, "negotiatorId">
+
+// Admin override: unlike updateOffer, this isn't gated on
+// businessConfirmedAt — an Admin can correct terms even after the business
+// has confirmed them. The one line that stays immutable is a customer's
+// already-recorded decision; touching that would corrupt a closed record.
+// businessFeedback is left untouched (this isn't a re-draft responding to
+// it, the way the Negotiator's edit path is).
+export async function adminUpdateOffer(offerId: string, input: AdminUpdateOfferInput, adminId: string) {
+  const existing = await prisma.offer.findUniqueOrThrow({ where: { id: offerId } })
+  if (existing.customerDecision) {
+    throw new Error("The customer has already decided on this offer — it can no longer be edited.")
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const before = { finalPriceCents: existing.finalPriceCents, status: existing.status }
+    const updated = await tx.offer.update({
+      where: { id: offerId },
+      data: {
+        originalValueCents: input.originalValueCents,
+        finalPriceCents: input.finalPriceCents,
+        currency: input.currency,
+        includedGoods: input.includedGoods,
+        additionalBenefits: input.additionalBenefits,
+        conditions: input.conditions,
+        validUntil: input.validUntil,
+        paymentTerms: input.paymentTerms,
+        deliveryTerms: input.deliveryTerms,
+      },
+    })
+    await recordAudit(tx, {
+      actorType: "ADMIN",
+      actorId: adminId,
+      caseId: existing.caseId,
+      action: "OFFER_UPDATED",
+      relatedEntityType: "Offer",
+      relatedEntityId: offerId,
+      before,
+      after: { finalPriceCents: updated.finalPriceCents, status: updated.status },
+      sourceChannel: "internal",
+    })
+    return updated
+  })
+}
