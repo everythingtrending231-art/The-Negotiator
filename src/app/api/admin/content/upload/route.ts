@@ -34,6 +34,11 @@ export async function POST(request: Request) {
         return {
           allowedContentTypes: ALLOWED_MIME_TYPES,
           maximumSizeInBytes: isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES,
+          // The client sends a stable pathname (content/<blockId>.<ext>) so
+          // replacing a block's media reuses the same path — allow that
+          // overwrite explicitly rather than requiring a fresh path (and
+          // thus a fresh blob token) on every single re-upload.
+          allowOverwrite: true,
         }
       },
     })
