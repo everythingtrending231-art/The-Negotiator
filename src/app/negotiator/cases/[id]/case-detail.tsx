@@ -39,6 +39,7 @@ type NegotiationCase = {
   notes: string | null
   categoryName: string
   businessName: string | null
+  customerPreferredBusinessName: string | null
   customerEmail: string
   assignedNegotiatorName: string | null
   escalated: boolean
@@ -255,6 +256,12 @@ export default function CaseDetail(props: {
           {c.location && <p>Location: {c.location}</p>}
         </div>
         {c.notes && <p className="text-sm text-ink-muted">Notes: {c.notes}</p>}
+        {c.customerPreferredBusinessName && (
+          <p className="text-sm text-ink-soft">
+            Customer&apos;s pick: {c.customerPreferredBusinessName}{" "}
+            <span className="text-xs text-ink-muted">(non-binding — not yet the locked-in business)</span>
+          </p>
+        )}
         {c.businessName && <p className="text-sm text-ink-soft">Business: {c.businessName}</p>}
 
         <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-border">

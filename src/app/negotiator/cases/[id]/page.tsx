@@ -13,6 +13,7 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
     include: {
       category: true,
       business: true,
+      customerPreferredBusiness: true,
       assignedNegotiator: true,
       ticket: true,
       messages: { orderBy: { createdAt: "asc" }, include: { authorNegotiator: true } },
@@ -52,6 +53,7 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
         notes: negotiationCase.notes,
         categoryName: negotiationCase.category.name,
         businessName: negotiationCase.business?.name ?? null,
+        customerPreferredBusinessName: negotiationCase.customerPreferredBusiness?.name ?? null,
         customerEmail: negotiationCase.ticket?.customerEmail ?? "",
         assignedNegotiatorName: negotiationCase.assignedNegotiator?.name ?? null,
         escalated: negotiationCase.escalated,

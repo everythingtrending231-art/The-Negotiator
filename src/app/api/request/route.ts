@@ -19,6 +19,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid category" }, { status: 400 })
   }
 
+  // Re-verify server-side rather than trusting the client — the preferred
+  // business must actually be published, customer-visible, and associated
+  // with the chosen category. This is a non-binding hint (see schema
+  // comment on customerPreferredBusinessId), but a spoofed/unpublished
+  // business id must never be persisted regardless.
+  const preferredBusinessIdInput = typeof body?.businessId === "string" ? body.businessId : ""
+  let customerPreferredBusinessId: string | undefined
+  if (preferredBusinessIdInput) {
+    const business = await prisma.business.findFirst({
+      where: {
+        id: preferredBusinessIdInput,
+        customerVisible: true,
+        publishStatus: "PUBLISHED",
+        categories: { some: { categoryId } },
+      },
+      select: { id: true },
+    })
+    customerPreferredBusinessId = business?.id
+  }
+
   const { negotiationCase } = await createCase({
     email,
     categoryId,
@@ -32,6 +52,7 @@ export async function POST(request: Request) {
     notes: typeof body?.notes === "string" && body.notes ? body.notes : undefined,
     categoryFieldValues:
       body?.categoryFieldValues && typeof body.categoryFieldValues === "object" ? body.categoryFieldValues : undefined,
+    customerPreferredBusinessId,
   })
 
   return NextResponse.json({ caseRef: negotiationCase.publicRef }, { status: 201 })

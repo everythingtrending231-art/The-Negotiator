@@ -29,11 +29,13 @@ import {
 import NegotiatorMark from "@/components/negotiator-mark"
 
 type CategoryField = { id: string; fieldName: string; fieldType: string; required: boolean }
-type Category = { id: string; name: string; fields: CategoryField[] }
+type CategoryBusiness = { id: string; name: string; logoUrl: string | null; description: string | null }
+type Category = { id: string; name: string; fields: CategoryField[]; businesses: CategoryBusiness[] }
 
 const requestSchema = z.object({
   email: z.string().email("Enter a valid email"),
   categoryId: z.string().min(1, "Choose a category"),
+  businessId: z.string().optional(),
   description: z.string().min(10, "Tell us a bit more about what you need"),
   url: z.string().url("Enter a valid URL").optional().or(z.literal("")),
   targetPrice: z.string().optional(),
@@ -57,6 +59,7 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
     defaultValues: {
       email: "",
       categoryId: "",
+      businessId: "",
       description: "",
       url: "",
       targetPrice: "",
@@ -203,7 +206,15 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Category</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select
+                  onValueChange={(value) => {
+                    field.onChange(value)
+                    // Switching category invalidates any previously picked
+                    // business — the pill list itself is about to change.
+                    form.setValue("businessId", "")
+                  }}
+                  value={field.value}
+                >
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="What kind of request is this?" />
@@ -221,6 +232,61 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
               </FormItem>
             )}
           />
+
+          <AnimatePresence initial={false}>
+            {selectedCategory && selectedCategory.businesses.length > 0 && (
+              <motion.div
+                key={`businesses-${selectedCategory.id}`}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-3">
+                  <p className="text-sm font-bold text-ink-muted">
+                    Business or seller, if known{" "}
+                    <span className="font-normal text-ink-muted">(optional — tap to pick one)</span>
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCategory.businesses.map((business) => {
+                      const selected = form.watch("businessId") === business.id
+                      return (
+                        <button
+                          key={business.id}
+                          type="button"
+                          aria-pressed={selected}
+                          title={business.description ?? undefined}
+                          onClick={() =>
+                            form.setValue("businessId", selected ? "" : business.id)
+                          }
+                          className={`inline-flex items-center gap-2 rounded-pill border px-3 py-2 transition-colors ${
+                            selected
+                              ? "border-cobalt-600 bg-cobalt-600 text-white"
+                              : "border-border bg-white text-ink hover:border-cobalt-600"
+                          }`}
+                        >
+                          {business.logoUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={business.logoUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                          ) : (
+                            <span
+                              className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                                selected ? "bg-white text-cobalt-600" : "bg-cobalt-600 text-white"
+                              }`}
+                            >
+                              {business.name.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                          <span className="text-sm font-semibold">{business.name}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <FormField
             control={form.control}
