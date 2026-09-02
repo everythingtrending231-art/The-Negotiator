@@ -434,8 +434,12 @@ export default function CaseDetail(props: {
                     </div>
                     <div className="text-right">
                       <StatusBadge status={offer.status} />
-                      {offer.customerDecision && (
-                        <p className="text-xs text-ink-muted mt-1">Customer: {statusLabel(offer.customerDecision)}</p>
+                      {offer.customerDecision === "ACCEPTED" ? (
+                        <p className="text-xs font-bold text-emerald-700 mt-1">Deal confirmed</p>
+                      ) : (
+                        offer.customerDecision && (
+                          <p className="text-xs text-ink-muted mt-1">Customer: {statusLabel(offer.customerDecision)}</p>
+                        )
                       )}
                     </div>
                   </div>

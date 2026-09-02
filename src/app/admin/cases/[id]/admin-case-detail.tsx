@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -100,6 +101,8 @@ export default function AdminCaseDetail(props: {
 
   const isClosed = ["ACCEPTED", "DECLINED", "EXPIRED", "CANCELLED", "CLOSED"].includes(c.status)
 
+  const hasAcceptedOffer = props.offers.some((o) => o.customerDecision === "ACCEPTED")
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-6">
       <div className="flex items-center justify-between">
@@ -112,6 +115,15 @@ export default function AdminCaseDetail(props: {
           <StatusBadge status={c.status} />
         </div>
       </div>
+
+      {hasAcceptedOffer && (
+        <Link
+          href={`/admin/cases/${c.id}/receipt`}
+          className="inline-block text-sm font-bold text-cobalt-600 underline"
+        >
+          View deal summary →
+        </Link>
+      )}
 
       <Card className="p-6 space-y-3">
         <p className="text-sm text-ink-muted">Customer: {c.customerEmail}</p>
@@ -192,8 +204,12 @@ export default function AdminCaseDetail(props: {
                     </div>
                     <div className="text-right">
                       <StatusBadge status={offer.status} />
-                      {offer.customerDecision && (
-                        <p className="text-xs text-ink-muted mt-1">Customer: {statusLabel(offer.customerDecision)}</p>
+                      {offer.customerDecision === "ACCEPTED" ? (
+                        <p className="text-xs font-bold text-emerald-700 mt-1">Deal confirmed</p>
+                      ) : (
+                        offer.customerDecision && (
+                          <p className="text-xs text-ink-muted mt-1">Customer: {statusLabel(offer.customerDecision)}</p>
+                        )
                       )}
                     </div>
                   </div>

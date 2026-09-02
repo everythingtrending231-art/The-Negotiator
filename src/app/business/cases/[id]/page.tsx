@@ -73,11 +73,26 @@ export default async function BusinessCaseDetailPage({ params }: { params: Promi
       </Card>
 
       {/* "Action needed" states get an amber accent so they read as
-          distinct from passive "waiting on someone else" states. */}
+          distinct from passive "waiting on someone else" states. A
+          business-confirmed offer and a customer-accepted deal are two
+          different things — "Confirmed" here always means the business's
+          own confirmation; the customer's decision gets its own distinct
+          heading rather than overloading the same word. */}
       {isMyCase && latestOffer && (
-        <Card className={cn("p-6 space-y-3", !latestOffer.businessConfirmedAt && "border-l-4 border-l-amber-500")}>
+        <Card
+          className={cn(
+            "p-6 space-y-3",
+            latestOffer.customerDecision === "ACCEPTED"
+              ? "border-l-4 border-l-emerald-500"
+              : !latestOffer.businessConfirmedAt && "border-l-4 border-l-amber-500",
+          )}
+        >
           <h2 className="font-bold text-cobalt-600">
-            {latestOffer.businessConfirmedAt ? "Confirmed offer" : "Draft offer from your Negotiator"}
+            {latestOffer.customerDecision === "ACCEPTED"
+              ? "Deal confirmed"
+              : latestOffer.businessConfirmedAt
+                ? "Confirmed offer"
+                : "Draft offer from your Negotiator"}
           </h2>
           <p className="text-2xl font-black">{formatCents(latestOffer.finalPriceCents, latestOffer.currency)}</p>
           <p className="text-ink-soft">{latestOffer.includedGoods}</p>
