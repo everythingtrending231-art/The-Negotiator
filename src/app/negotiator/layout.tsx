@@ -10,7 +10,11 @@ export default async function NegotiatorLayout({ children }: { children: React.R
       sessionLabel={session.name}
       nav={[
         { label: "Cases", href: "/negotiator/cases" },
+        { label: "Businesses", href: "/negotiator/businesses" },
+        { label: "Agreements", href: "/negotiator/agreements" },
+        { label: "Messages", href: "/negotiator/messages" },
         { label: "Analytics", href: "/negotiator/analytics" },
+        { label: "Profile", href: "/negotiator/profile" },
       ]}
     >
       {children}

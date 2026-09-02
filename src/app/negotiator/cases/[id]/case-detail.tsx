@@ -41,6 +41,8 @@ type NegotiationCase = {
   businessName: string | null
   customerEmail: string
   assignedNegotiatorName: string | null
+  escalated: boolean
+  escalatedReason: string | null
 }
 
 type Message = { id: string; authorType: "NEGOTIATOR" | "CUSTOMER"; authorName: string | null; body: string; createdAt: string }
@@ -69,7 +71,7 @@ type Invite = {
   respondedAt: string | null
 }
 
-type ActionKey = "assign" | "status" | "invite" | "note" | "message"
+type ActionKey = "assign" | "status" | "invite" | "note" | "message" | "escalate"
 
 export default function CaseDetail(props: {
   negotiationCase: NegotiationCase
@@ -89,6 +91,8 @@ export default function CaseDetail(props: {
   const [showOfferForm, setShowOfferForm] = useState(false)
   const [showInviteForm, setShowInviteForm] = useState(false)
   const [selectedBusinessIds, setSelectedBusinessIds] = useState<string[]>([])
+  const [showEscalateForm, setShowEscalateForm] = useState(false)
+  const [escalateReason, setEscalateReason] = useState("")
 
   async function runAction(key: ActionKey, fn: () => Promise<Response>, successMessage: string) {
     setBusy((b) => ({ ...b, [key]: true }))
@@ -170,6 +174,32 @@ export default function CaseDetail(props: {
     if (ok) setNote("")
   }
 
+  async function escalate() {
+    if (!escalateReason.trim()) return
+    const ok = await runAction(
+      "escalate",
+      () =>
+        fetch(`/api/negotiator/cases/${props.negotiationCase.id}/escalate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: escalateReason }),
+        }),
+      "Case escalated."
+    )
+    if (ok) {
+      setEscalateReason("")
+      setShowEscalateForm(false)
+    }
+  }
+
+  async function unescalate() {
+    await runAction(
+      "escalate",
+      () => fetch(`/api/negotiator/cases/${props.negotiationCase.id}/escalate`, { method: "DELETE" }),
+      "Escalation cleared."
+    )
+  }
+
   async function sendMessage() {
     if (!message.trim()) return
     const ok = await runAction(
@@ -199,7 +229,10 @@ export default function CaseDetail(props: {
           <p className="text-xs font-bold uppercase tracking-wide text-amber-800">{c.publicRef}</p>
           <h1 className="text-2xl font-black text-cobalt-600">{c.categoryName}</h1>
         </div>
-        <StatusBadge status={c.status} />
+        <div className="flex items-center gap-2">
+          {c.escalated && <StatusBadge status="DISPUTED" label="Escalated" />}
+          <StatusBadge status={c.status} />
+        </div>
       </motion.div>
 
       {/* Persistent case-context panel — always visible regardless of which
@@ -247,6 +280,47 @@ export default function CaseDetail(props: {
           <Button size="sm" disabled={busy.status} onClick={updateStatus}>
             {busy.status ? "Updating…" : "Update status"}
           </Button>
+        </div>
+
+        <div className="pt-3 border-t border-border space-y-3">
+          {c.escalated ? (
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-rose-700">Escalated</p>
+                {c.escalatedReason && <p className="text-sm text-ink-muted">{c.escalatedReason}</p>}
+              </div>
+              <Button size="sm" variant="outline" disabled={busy.escalate} onClick={unescalate}>
+                {busy.escalate ? "Clearing…" : "Clear escalation"}
+              </Button>
+            </div>
+          ) : (
+            <>
+              <Button size="sm" variant="outline" onClick={() => setShowEscalateForm((v) => !v)}>
+                {showEscalateForm ? "Cancel" : "Escalate this case"}
+              </Button>
+              <AnimatePresence>
+                {showEscalateForm && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden space-y-2"
+                  >
+                    <Textarea
+                      rows={2}
+                      value={escalateReason}
+                      onChange={(e) => setEscalateReason(e.target.value)}
+                      placeholder="Why does this need escalation? (value threshold, legal terms, relationship risk, dispute, lacks authority, safety/compliance…)"
+                    />
+                    <Button size="sm" variant="destructive" disabled={busy.escalate || !escalateReason.trim()} onClick={escalate}>
+                      {busy.escalate ? "Escalating…" : "Confirm escalation"}
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </>
+          )}
         </div>
       </Card>
 

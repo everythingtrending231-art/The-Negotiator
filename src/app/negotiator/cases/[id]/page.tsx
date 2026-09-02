@@ -54,6 +54,8 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
         businessName: negotiationCase.business?.name ?? null,
         customerEmail: negotiationCase.ticket?.customerEmail ?? "",
         assignedNegotiatorName: negotiationCase.assignedNegotiator?.name ?? null,
+        escalated: negotiationCase.escalated,
+        escalatedReason: negotiationCase.escalatedReason,
       }}
       messages={negotiationCase.messages.map((m) => ({
         id: m.id,
