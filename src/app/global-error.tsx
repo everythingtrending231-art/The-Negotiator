@@ -1,12 +1,19 @@
 "use client"
 
+import { useEffect } from "react"
+import * as Sentry from "@sentry/nextjs"
+
 // Catches an error thrown in the root layout itself (fonts, MotionConfig)
 // rather than a page below it — error.tsx doesn't cover that case. Renders
 // its own <html>/<body> since it replaces the root layout entirely when
 // active, and deliberately depends on nothing beyond plain Tailwind
 // classes (no framer-motion, no custom components) — this is the last
 // line of defense, so it shouldn't be able to fail itself.
-export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    Sentry.captureException(error)
+  }, [error])
+
   return (
     <html lang="en">
       <body>
