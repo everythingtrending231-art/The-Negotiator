@@ -2,8 +2,17 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/server/db"
 import { createCase } from "@/server/services/cases"
 import { dollarsToCents } from "@/lib/money"
+import { checkRateLimit, getClientIp } from "@/server/services/rate-limit"
 
 export async function POST(request: Request) {
+  const allowed = await checkRateLimit(`request:${getClientIp(request)}`, {
+    windowMs: 60 * 60 * 1000,
+    max: 5,
+  })
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests — please try again later." }, { status: 429 })
+  }
+
   const body = await request.json().catch(() => null)
 
   const email = typeof body?.email === "string" ? body.email.trim() : ""
