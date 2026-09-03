@@ -357,6 +357,7 @@ model NegotiationCase {
   auditLogs     AuditLog[]
   invites       CaseBusinessInvite[]
   feedback      Feedback?
+  disputes      Dispute[]
 
   @@index([status])
 }
@@ -495,6 +496,57 @@ model InternalNote {
   createdAt DateTime @default(now())
 
   @@index([caseId])
+}
+
+// docs/13_TRUST_RISK_COMPLIANCE.md §9's process (Intake, Evidence
+// collection, Review, Communication, Resolution, Escalation, Closure) —
+// a Dispute is the formal record; its notes carry the evidence/review/
+// communication trail. Distinct from NegotiationCase.escalated, which is
+// a lightweight negotiator flag, not a case record with its own lifecycle.
+// Staff-only (Negotiator/Admin) — never exposed to the Business or
+// Customer views (CLAUDE.md non-negotiable #3).
+enum DisputeStatus {
+  OPEN
+  RESOLVED
+}
+
+model Dispute {
+  id     String          @id @default(cuid())
+  caseId String
+  case   NegotiationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  status DisputeStatus @default(OPEN)
+  reason String
+
+  raisedByType ActorType
+  raisedById   String?
+
+  resolution     String?
+  resolvedAt     DateTime?
+  resolvedByType ActorType?
+  resolvedById   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  notes DisputeNote[]
+
+  @@index([caseId])
+  @@index([status])
+}
+
+model DisputeNote {
+  id        String  @id @default(cuid())
+  disputeId String
+  dispute   Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  authorType ActorType
+  authorId   String?
+  body       String
+
+  createdAt DateTime @default(now())
+
+  @@index([disputeId])
 }
 
 enum OfferStatus {
