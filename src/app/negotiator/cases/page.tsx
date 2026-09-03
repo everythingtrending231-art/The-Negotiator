@@ -7,6 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import StatusBadge from "@/components/status-badge"
 import { statusLabel } from "@/lib/status-badge"
 import { cn } from "@/lib/utils"
+import CaseSearchInput from "@/components/case-search-input"
+import type { Prisma } from "@prisma/client"
 
 // A smaller set of quick filters up top for the common views, with the
 // full 15-value status vocabulary tucked into "More statuses" below it —
@@ -29,14 +31,21 @@ function FilterPill({
   value,
   label,
   active,
+  q,
 }: {
   value?: CaseStatus
   label: string
   active: boolean
+  q?: string
 }) {
+  const params = new URLSearchParams()
+  if (value) params.set("status", value)
+  if (q?.trim()) params.set("q", q.trim())
+  const query = params.toString()
+
   return (
     <Link
-      href={value ? `/negotiator/cases?status=${value}` : "/negotiator/cases"}
+      href={query ? `/negotiator/cases?${query}` : "/negotiator/cases"}
       className={cn(
         "inline-flex items-center px-3 py-1.5 rounded-pill text-xs font-bold border transition-colors",
         active
@@ -105,14 +114,25 @@ function QueueGroup({ title, cases, highlight }: { title: string; cases: QueueCa
 export default async function NegotiatorCasesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>
+  searchParams: Promise<{ status?: string; q?: string }>
 }) {
-  const { status } = await searchParams
+  const { status, q } = await searchParams
   const filterStatus = status && status in CaseStatusEnum ? (status as CaseStatus) : undefined
+
+  const listWhere: Prisma.NegotiationCaseWhereInput = {}
+  if (filterStatus) listWhere.status = filterStatus
+  if (q?.trim()) {
+    const query = q.trim()
+    listWhere.OR = [
+      { publicRef: { contains: query, mode: "insensitive" } },
+      { description: { contains: query, mode: "insensitive" } },
+      { ticket: { customerEmail: { contains: query, mode: "insensitive" } } },
+    ]
+  }
 
   const [cases, queueCases] = await Promise.all([
     prisma.negotiationCase.findMany({
-      where: filterStatus ? { status: filterStatus } : undefined,
+      where: listWhere,
       orderBy: { createdAt: "desc" },
       include: { category: true, assignedNegotiator: true, ticket: true },
       take: 100,
@@ -171,10 +191,14 @@ export default async function NegotiatorCasesPage({
       <div>
         <h2 className="text-lg font-black text-cobalt-600 mb-4">All cases</h2>
 
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <CaseSearchInput placeholder="Search by case number, email, or description…" />
+        </div>
+
         <div className="flex flex-wrap items-center gap-2 mb-3">
-          <FilterPill label="All" active={!filterStatus} />
+          <FilterPill label="All" active={!filterStatus} q={q} />
           {QUICK_FILTERS.map((value) => (
-            <FilterPill key={value} value={value} label={statusLabel(value)} active={filterStatus === value} />
+            <FilterPill key={value} value={value} label={statusLabel(value)} active={filterStatus === value} q={q} />
           ))}
         </div>
 
@@ -184,7 +208,7 @@ export default async function NegotiatorCasesPage({
           </summary>
           <div className="flex flex-wrap gap-2 mt-2">
             {otherStatuses.map((value) => (
-              <FilterPill key={value} value={value} label={statusLabel(value)} active={filterStatus === value} />
+              <FilterPill key={value} value={value} label={statusLabel(value)} active={filterStatus === value} q={q} />
             ))}
           </div>
         </details>
@@ -192,7 +216,8 @@ export default async function NegotiatorCasesPage({
         <Card className="p-0 overflow-hidden">
           {cases.length === 0 ? (
             <p className="p-6 text-sm text-ink-muted">
-              No cases {filterStatus ? `in ${statusLabel(filterStatus)}` : "yet"}.
+              No cases {filterStatus ? `in ${statusLabel(filterStatus)}` : "yet"}
+              {q?.trim() ? ` matching "${q.trim()}"` : ""}.
             </p>
           ) : (
             <Table>

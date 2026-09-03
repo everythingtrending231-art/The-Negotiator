@@ -15,6 +15,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       fieldName: typeof body?.fieldName === "string" ? body.fieldName : undefined,
       fieldType: typeof body?.fieldType === "string" ? body.fieldType : undefined,
       required: typeof body?.required === "boolean" ? body.required : undefined,
+      fieldOptions: Array.isArray(body?.fieldOptions)
+        ? body.fieldOptions.filter((o: unknown): o is string => typeof o === "string" && o.trim().length > 0)
+        : undefined,
     },
     auth.session,
   )

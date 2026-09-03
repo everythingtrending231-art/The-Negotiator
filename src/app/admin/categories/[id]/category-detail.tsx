@@ -29,7 +29,7 @@ type Category = {
   customerVisible: boolean
   caseCount: number
 }
-type Field = { id: string; fieldName: string; fieldType: string; required: boolean }
+type Field = { id: string; fieldName: string; fieldType: string; required: boolean; fieldOptions: string[] }
 type Business = { id: string; name: string }
 type AuditLogRow = { id: string; action: string; actorType: string; createdAt: string }
 
@@ -52,6 +52,7 @@ export default function CategoryDetail(props: {
   const [fieldName, setFieldName] = useState("")
   const [fieldType, setFieldType] = useState("text")
   const [fieldRequired, setFieldRequired] = useState(false)
+  const [fieldOptionsInput, setFieldOptionsInput] = useState("")
 
   const archiveConfirm = useConfirmDialog()
   const removeFieldConfirm = useConfirmDialog()
@@ -117,10 +118,19 @@ export default function CategoryDetail(props: {
     await fetch(`/api/admin/categories/${c.id}/fields`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fieldName, fieldType, required: fieldRequired }),
+      body: JSON.stringify({
+        fieldName,
+        fieldType,
+        required: fieldRequired,
+        fieldOptions: fieldOptionsInput
+          .split(",")
+          .map((o) => o.trim())
+          .filter(Boolean),
+      }),
     })
     setFieldName("")
     setFieldRequired(false)
+    setFieldOptionsInput("")
     setBusy(false)
     toast.success("Field added.")
     router.refresh()
@@ -209,16 +219,19 @@ export default function CategoryDetail(props: {
         <h2 className="font-bold text-cobalt-600">Request fields</h2>
         <div className="space-y-2">
           {props.fields.map((field) => (
-            <div key={field.id} className="flex items-center justify-between border border-border rounded-lg p-3">
-              <div>
-                <p className="font-bold text-sm">{field.fieldName}</p>
-                <p className="text-xs text-ink-muted">
-                  {field.fieldType} {field.required ? "· required" : ""}
-                </p>
+            <div key={field.id} className="border border-border rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-sm">{field.fieldName}</p>
+                  <p className="text-xs text-ink-muted">
+                    {field.fieldType} {field.required ? "· required" : ""}
+                  </p>
+                </div>
+                <Button size="sm" variant="ghost" disabled={busy} onClick={() => requestRemoveField(field)}>
+                  Remove
+                </Button>
               </div>
-              <Button size="sm" variant="ghost" disabled={busy} onClick={() => requestRemoveField(field)}>
-                Remove
-              </Button>
+              {field.fieldType === "select" && <FieldOptionsEditor categoryId={c.id} field={field} />}
             </div>
           ))}
         </div>
@@ -246,6 +259,17 @@ export default function CategoryDetail(props: {
             <Label htmlFor="fieldRequired">Required</Label>
           </div>
         </div>
+        {fieldType === "select" && (
+          <div className="space-y-1">
+            <Label htmlFor="new-field-options">Choices (comma-separated)</Label>
+            <Input
+              id="new-field-options"
+              placeholder="e.g. Economy, Standard, Luxury"
+              value={fieldOptionsInput}
+              onChange={(e) => setFieldOptionsInput(e.target.value)}
+            />
+          </div>
+        )}
         <Button size="sm" disabled={busy || !fieldName.trim()} onClick={addField}>
           Add field
         </Button>
@@ -292,6 +316,52 @@ export default function CategoryDetail(props: {
         busy={busy}
         onConfirm={confirmRemoveField}
       />
+    </div>
+  )
+}
+
+function FieldOptionsEditor({ categoryId, field }: { categoryId: string; field: Field }) {
+  const router = useRouter()
+  const [value, setValue] = useState(field.fieldOptions.join(", "))
+  const [busy, setBusy] = useState(false)
+
+  async function save() {
+    setBusy(true)
+    const res = await fetch(`/api/admin/categories/${categoryId}/fields/${field.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fieldOptions: value
+          .split(",")
+          .map((o) => o.trim())
+          .filter(Boolean),
+      }),
+    })
+    setBusy(false)
+    if (!res.ok) {
+      toast.error("Couldn't save choices.")
+      return
+    }
+    toast.success("Choices saved.")
+    router.refresh()
+  }
+
+  return (
+    <div className="flex items-end gap-2 pt-1 border-t border-border">
+      <div className="flex-1 space-y-1">
+        <Label htmlFor={`options-${field.id}`} className="text-xs">
+          Choices (comma-separated)
+        </Label>
+        <Input
+          id={`options-${field.id}`}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="e.g. Economy, Standard, Luxury"
+        />
+      </div>
+      <Button size="sm" variant="outline" disabled={busy} onClick={save}>
+        Save
+      </Button>
     </div>
   )
 }

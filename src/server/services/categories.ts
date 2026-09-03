@@ -120,7 +120,12 @@ export async function reorderCategory(id: string, direction: "up" | "down", acto
   })
 }
 
-export type CategoryFieldInput = { fieldName: string; fieldType: string; required: boolean }
+export type CategoryFieldInput = {
+  fieldName: string
+  fieldType: string
+  required: boolean
+  fieldOptions?: string[]
+}
 
 // Individual CRUD, not wholesale replace — so field ids already referenced
 // by existing cases' categoryFieldValues stay stable.
@@ -134,6 +139,7 @@ export async function addCategoryField(categoryId: string, field: CategoryFieldI
         fieldName: field.fieldName,
         fieldType: field.fieldType,
         required: field.required,
+        fieldOptions: field.fieldOptions ?? [],
         displayOrder: count,
       },
     })

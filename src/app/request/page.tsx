@@ -39,6 +39,7 @@ export default async function RequestPage() {
               fieldName: field.fieldName,
               fieldType: field.fieldType,
               required: field.required,
+              fieldOptions: field.fieldOptions,
             })),
             businesses: category.businesses.map((bc) => ({
               id: bc.business.id,
