@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import StatusBadge from "@/components/status-badge"
 import ConfirmDialog, { useConfirmDialog } from "@/components/confirm-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { formatHours, formatPercent } from "@/lib/format"
 
 const VERIFICATION_STATUSES = ["PROSPECT", "QUALIFIED", "VERIFIED", "ACTIVE", "SUSPENDED", "TERMINATED"]
 const AGREEMENT_TYPES = [
@@ -57,6 +58,9 @@ type Performance = {
   acceptedOffersCount: number
   acceptanceRate: number | null
   disputedCasesCount: number
+  invitesSentCount: number
+  responseRate: number | null
+  avgResponseHours: number | null
 }
 type AuditLogRow = { id: string; action: string; actorType: string; createdAt: string }
 
@@ -477,9 +481,13 @@ export default function BusinessDetail(props: {
                   : "—"}
               </p>
               <p>Disputed cases: {props.performance.disputedCasesCount}</p>
+              <p>Requests sent: {props.performance.invitesSentCount}</p>
+              <p>Response rate: {formatPercent(props.performance.responseRate)}</p>
+              <p>Avg. response time: {formatHours(props.performance.avgResponseHours)}</p>
             </div>
             <p className="text-xs text-ink-muted">
-              Offer rate approximates &quot;response rate&quot; — the schema has no dedicated response event.
+              Response rate/time are from requests sent to this business (excluding ones withdrawn because a
+              Negotiator went with another business) — not offer rate, which is a separate figure above.
             </p>
           </Card>
         </TabsContent>

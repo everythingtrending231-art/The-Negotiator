@@ -11,6 +11,8 @@ describe("getPlatformAnalytics", () => {
     expect(analytics.offerRate).toBeNull()
     expect(analytics.repeatRequestRate).toBeNull()
     expect(analytics.disputeRate).toBeNull()
+    expect(analytics.escalationRate).toBeNull()
+    expect(analytics.partnerRetentionRate).toBeNull()
     expect(analytics.closedDealsCount).toBe(0)
     expect(analytics.totalDealValueCents).toBe(0)
     expect(analytics.feedbackResponseRate).toBeNull()
@@ -84,6 +86,40 @@ describe("getPlatformAnalytics", () => {
 
     const analytics = await getPlatformAnalytics()
     expect(analytics.repeatRequestRate).toBe(1) // 1 of 1 distinct email group had >1 ticket
+  })
+
+  it("computes escalation rate from the escalated flag", async () => {
+    const caseA = await createCase()
+    const caseB = await createCase()
+    await createCase()
+    await testPrisma.negotiationCase.update({ where: { id: caseA.id }, data: { escalated: true } })
+    await testPrisma.negotiationCase.update({ where: { id: caseB.id }, data: { escalated: true } })
+
+    const analytics = await getPlatformAnalytics()
+    expect(analytics.escalationRate).toBeCloseTo(2 / 3)
+  })
+
+  it("counts a business retained only when its cases span more than one calendar month", async () => {
+    const business = await testPrisma.business.create({ data: { name: "Retained Co" } })
+    const oneOff = await testPrisma.business.create({ data: { name: "One-Off Co" } })
+
+    const earlierCase = await createCase({ businessId: business.id })
+    const laterCase = await createCase({ businessId: business.id })
+    await testPrisma.negotiationCase.update({
+      where: { id: earlierCase.id },
+      data: { createdAt: new Date("2026-01-01") },
+    })
+    await testPrisma.negotiationCase.update({
+      where: { id: laterCase.id },
+      data: { createdAt: new Date("2026-06-01") },
+    })
+
+    await createCase({ businessId: oneOff.id })
+
+    const analytics = await getPlatformAnalytics()
+    // 1 of 2 businesses with case history (retained vs. one-off) — the
+    // retained business's two cases were pinned to different months.
+    expect(analytics.partnerRetentionRate).toBe(0.5)
   })
 })
 

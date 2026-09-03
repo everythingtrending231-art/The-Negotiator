@@ -189,6 +189,42 @@ describe("computeBusinessPerformanceSummary", () => {
     expect(summary.offerRate).toBeNull()
     expect(summary.acceptanceRate).toBeNull()
     expect(summary.avgValueCreated).toBeNull()
+    expect(summary.responseRate).toBeNull()
+    expect(summary.avgResponseHours).toBeNull()
+  })
+
+  it("computes response rate/time from invites, excluding withdrawn ones", async () => {
+    const business = await createBusinessFixture()
+    const caseA = await createCase({ businessId: business.id })
+    const caseB = await createCase({ businessId: business.id })
+    const caseC = await createCase({ businessId: business.id })
+
+    await testPrisma.caseBusinessInvite.create({
+      data: {
+        caseId: caseA.id,
+        businessId: business.id,
+        status: "ACCEPTED",
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+        respondedAt: new Date("2026-01-01T12:00:00Z"),
+      },
+    })
+    await testPrisma.caseBusinessInvite.create({
+      data: {
+        caseId: caseB.id,
+        businessId: business.id,
+        status: "PENDING",
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+      },
+    })
+    // Withdrawn — excluded from both the denominator and the average.
+    await testPrisma.caseBusinessInvite.create({
+      data: { caseId: caseC.id, businessId: business.id, status: "WITHDRAWN" },
+    })
+
+    const summary = await computeBusinessPerformanceSummary(business.id)
+    expect(summary.invitesSentCount).toBe(2)
+    expect(summary.responseRate).toBe(0.5)
+    expect(summary.avgResponseHours).toBe(12)
   })
 })
 

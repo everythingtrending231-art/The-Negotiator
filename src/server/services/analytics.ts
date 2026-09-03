@@ -5,12 +5,16 @@ import { isTerminal } from "@/server/services/cases"
 // Basic analytics per docs/16_MEASUREMENT_ANALYTICS.md — only the metrics
 // honestly computable from data this platform already collects. Explicitly
 // NOT included (flagged, not silently dropped — CLAUDE.md rule 6): all of
-// §5 Financial Metrics (need Transaction/Payment, Phase 3), referral rate/
-// partner retention (need referral/cohort tracking that was never built),
-// and §6 Quality Metrics (documentation completeness, unauthorized
-// commitments, complaints, escalations — no tracking mechanism exists for
-// any of these). Customer satisfaction *is* now trackable, via the
-// post-closure Feedback flow (docs/03 §12, src/server/services/feedback.ts).
+// §5 Financial Metrics (need Transaction/Payment, Phase 3), referral rate
+// (needs a referral/attribution mechanism that was never built), and most
+// of §6 Quality Metrics (documentation completeness, unauthorized
+// commitments, complaints — no tracking mechanism exists for any of
+// these). Customer satisfaction *is* now trackable, via the post-closure
+// Feedback flow (docs/03 §12, src/server/services/feedback.ts). Escalations
+// (§6) and partner retention (§4) are also now trackable — escalated is a
+// real field on NegotiationCase, and retention is approximated as "has
+// cases in more than one distinct calendar month," the same cohort-style
+// proxy repeatRequestRate below already uses for customers.
 //
 // Duration/rounds/price-improvement aren't natural SQL aggregates against
 // SQLite via Prisma, so those fetch the relevant rows and average in JS —
@@ -51,18 +55,27 @@ async function feedbackSummary(where: Prisma.FeedbackWhereInput) {
 }
 
 export async function getPlatformAnalytics() {
-  const [requestsSubmitted, requestsQualified, decidedOffers, acceptedOffers, totalOffers, activePartners, disputedCases] =
-    await Promise.all([
-      prisma.negotiationCase.count(),
-      // "Qualified" isn't a CaseStatus value — interpreted as "reached a
-      // Negotiator," i.e. assigned.
-      prisma.negotiationCase.count({ where: { assignedNegotiatorId: { not: null } } }),
-      prisma.offer.count({ where: { customerDecision: { not: null } } }),
-      prisma.offer.count({ where: { customerDecision: "ACCEPTED" } }),
-      prisma.offer.count(),
-      prisma.business.count({ where: { verificationStatus: "ACTIVE" } }),
-      prisma.negotiationCase.count({ where: { status: "DISPUTED" } }),
-    ])
+  const [
+    requestsSubmitted,
+    requestsQualified,
+    decidedOffers,
+    acceptedOffers,
+    totalOffers,
+    activePartners,
+    disputedCases,
+    escalatedCases,
+  ] = await Promise.all([
+    prisma.negotiationCase.count(),
+    // "Qualified" isn't a CaseStatus value — interpreted as "reached a
+    // Negotiator," i.e. assigned.
+    prisma.negotiationCase.count({ where: { assignedNegotiatorId: { not: null } } }),
+    prisma.offer.count({ where: { customerDecision: { not: null } } }),
+    prisma.offer.count({ where: { customerDecision: "ACCEPTED" } }),
+    prisma.offer.count(),
+    prisma.business.count({ where: { verificationStatus: "ACTIVE" } }),
+    prisma.negotiationCase.count({ where: { status: "DISPUTED" } }),
+    prisma.negotiationCase.count({ where: { escalated: true } }),
+  ])
 
   const emailGroups = await prisma.negotiationTicket.groupBy({
     by: ["customerEmail"],
@@ -139,6 +152,25 @@ export async function getPlatformAnalytics() {
   const totalDealValueCents = acceptedOfferValues.reduce((sum, o) => sum + o.finalPriceCents, 0)
   const avgDealValueCents = closedDealsCount > 0 ? totalDealValueCents / closedDealsCount : null
 
+  // Same cohort-style proxy as repeatRequestRate above: a business "retained"
+  // if it has cases spanning more than one distinct calendar month, rather
+  // than a single burst of activity.
+  const casesWithBusiness = await prisma.negotiationCase.findMany({
+    where: { businessId: { not: null } },
+    select: { businessId: true, createdAt: true },
+  })
+  const monthsByBusiness = new Map<string, Set<string>>()
+  for (const c of casesWithBusiness) {
+    const monthKey = `${c.createdAt.getFullYear()}-${c.createdAt.getMonth()}`
+    const months = monthsByBusiness.get(c.businessId!) ?? new Set<string>()
+    months.add(monthKey)
+    monthsByBusiness.set(c.businessId!, months)
+  }
+  const partnerRetentionRate =
+    monthsByBusiness.size > 0
+      ? Array.from(monthsByBusiness.values()).filter((months) => months.size > 1).length / monthsByBusiness.size
+      : null
+
   const feedback = await feedbackSummary({})
 
   return {
@@ -155,6 +187,8 @@ export async function getPlatformAnalytics() {
     activePartners,
     avgBusinessConfirmationHours,
     disputeRate: requestsSubmitted > 0 ? disputedCases / requestsSubmitted : null,
+    escalationRate: requestsSubmitted > 0 ? escalatedCases / requestsSubmitted : null,
+    partnerRetentionRate,
     closedDealsCount,
     totalDealValueCents,
     avgDealValueCents,
