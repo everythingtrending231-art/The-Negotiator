@@ -85,6 +85,7 @@ export default function AdminCaseDetail(props: {
   feedback: Feedback
   disputes: Dispute[]
   riskFlags: RiskFlag[]
+  dealTicketIssuedAt: string | null
 }) {
   const router = useRouter()
   const c = props.negotiationCase
@@ -354,6 +355,12 @@ export default function AdminCaseDetail(props: {
             <p className="text-xs text-ink-muted">
               Read-only here — edit offer terms from Admin → Offers.
             </p>
+            {props.dealTicketIssuedAt && (
+              <p className="text-xs text-emerald-700 font-bold">
+                Deal ticket issued {new Date(props.dealTicketIssuedAt).toLocaleString()} — Support can relay the
+                customer's ticket link if they've lost it (docs/03 §10.1).
+              </p>
+            )}
             {props.offers.length === 0 && <p className="text-sm text-ink-muted">No offers yet.</p>}
             <div className="space-y-2">
               {props.offers.map((offer) => (

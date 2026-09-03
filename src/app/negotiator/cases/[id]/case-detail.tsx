@@ -128,6 +128,7 @@ export default function CaseDetail(props: {
   feedback: Feedback
   disputes: Dispute[]
   riskFlags: RiskFlag[]
+  dealTicketIssuedAt: string | null
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState<Partial<Record<ActionKey, boolean>>>({})
@@ -588,6 +589,12 @@ export default function CaseDetail(props: {
               After negotiating terms with the business by phone, draft the offer here — the business must confirm
               it via their portal before the customer ever sees it.
             </p>
+            {props.dealTicketIssuedAt && (
+              <p className="text-xs text-emerald-700 font-bold">
+                Deal ticket issued {new Date(props.dealTicketIssuedAt).toLocaleString()} — Support can relay the
+                customer's ticket link if they've lost it (docs/03 §10.1).
+              </p>
+            )}
 
             {props.offers.length === 0 && <p className="text-sm text-ink-muted">No offers yet.</p>}
             <div className="space-y-2">

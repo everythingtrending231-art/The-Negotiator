@@ -219,32 +219,54 @@ describe("adminForceCloseCase", () => {
 })
 
 describe("recordCustomerDecision", () => {
-  it("accepts an offer: case -> ACCEPTED, offer -> ACCEPTED", async () => {
+  it("accepts an offer: case -> ACCEPTED, offer -> ACCEPTED, and issues a deal ticket", async () => {
     const negotiationCase = await createCase({ status: "OFFER_READY" })
     const offer = await createOffer({ caseId: negotiationCase.id, status: "PRESENTED" })
 
-    const updated = await recordCustomerDecision(negotiationCase.id, offer.id, "ACCEPTED")
+    const { negotiationCase: updated, dealTicketUrl } = await recordCustomerDecision(
+      negotiationCase.id,
+      offer.id,
+      "ACCEPTED",
+    )
     expect(updated.status).toBe("ACCEPTED")
+    expect(dealTicketUrl).toContain("/deal/")
 
     const updatedOffer = await testPrisma.offer.findUniqueOrThrow({ where: { id: offer.id } })
     expect(updatedOffer.status).toBe("ACCEPTED")
     expect(updatedOffer.customerDecision).toBe("ACCEPTED")
+
+    const ticket = await testPrisma.dealTicket.findUnique({ where: { caseId: negotiationCase.id } })
+    expect(ticket).not.toBeNull()
+    expect(ticket?.finalPriceCents).toBe(offer.finalPriceCents)
   })
 
-  it("declines an offer: case -> DECLINED, offer -> DECLINED", async () => {
+  it("declines an offer: case -> DECLINED, offer -> DECLINED, no deal ticket", async () => {
     const negotiationCase = await createCase({ status: "OFFER_READY" })
     const offer = await createOffer({ caseId: negotiationCase.id, status: "PRESENTED" })
 
-    const updated = await recordCustomerDecision(negotiationCase.id, offer.id, "DECLINED")
+    const { negotiationCase: updated, dealTicketUrl } = await recordCustomerDecision(
+      negotiationCase.id,
+      offer.id,
+      "DECLINED",
+    )
     expect(updated.status).toBe("DECLINED")
+    expect(dealTicketUrl).toBeNull()
+
+    const ticket = await testPrisma.dealTicket.findUnique({ where: { caseId: negotiationCase.id } })
+    expect(ticket).toBeNull()
   })
 
-  it("requests another round: case -> NEGOTIATING, offer -> SUPERSEDED", async () => {
+  it("requests another round: case -> NEGOTIATING, offer -> SUPERSEDED, no deal ticket", async () => {
     const negotiationCase = await createCase({ status: "OFFER_READY" })
     const offer = await createOffer({ caseId: negotiationCase.id, status: "PRESENTED" })
 
-    const updated = await recordCustomerDecision(negotiationCase.id, offer.id, "REQUESTED_ANOTHER_ROUND")
+    const { negotiationCase: updated, dealTicketUrl } = await recordCustomerDecision(
+      negotiationCase.id,
+      offer.id,
+      "REQUESTED_ANOTHER_ROUND",
+    )
     expect(updated.status).toBe("NEGOTIATING")
+    expect(dealTicketUrl).toBeNull()
 
     const updatedOffer = await testPrisma.offer.findUniqueOrThrow({ where: { id: offer.id } })
     expect(updatedOffer.status).toBe("SUPERSEDED")

@@ -162,6 +162,10 @@ export default function CaseDashboard(props: {
   // instead and render the confirmation from data already on the page —
   // REQUESTED_ANOTHER_ROUND isn't terminal, so that path still refreshes.
   const [confirmedDecision, setConfirmedDecision] = useState<"ACCEPTED" | "DECLINED" | null>(null)
+  // Only ever set on ACCEPTED — this is the one moment the customer can be
+  // handed the link before this page's AccessToken dies, so it has to come
+  // back in the decision response rather than a later fetch.
+  const [dealTicketUrl, setDealTicketUrl] = useState<string | null>(null)
 
   const effectiveStatus = confirmedDecision ?? props.status
   const effectiveOffer = props.offer ? { ...props.offer, customerDecision: confirmedDecision ?? props.offer.customerDecision } : null
@@ -200,6 +204,10 @@ export default function CaseDashboard(props: {
     }
     if (decision === "ACCEPTED" || decision === "DECLINED") {
       setConfirmedDecision(decision)
+      if (decision === "ACCEPTED") {
+        const body = await res.json().catch(() => null)
+        setDealTicketUrl(body?.dealTicketUrl ?? null)
+      }
     } else {
       router.refresh()
     }
@@ -352,9 +360,17 @@ export default function CaseDashboard(props: {
               </div>
             ) : (
               effectiveOffer.customerDecision && (
-                <p className="text-sm font-bold text-white/80 pt-4 mt-2 border-t border-white/15">
-                  You: {formatStatus(effectiveOffer.customerDecision)}
-                </p>
+                <div className="pt-4 mt-2 border-t border-white/15 space-y-3">
+                  <p className="text-sm font-bold text-white/80">You: {formatStatus(effectiveOffer.customerDecision)}</p>
+                  {effectiveOffer.customerDecision === "ACCEPTED" && dealTicketUrl && (
+                    <a
+                      href={dealTicketUrl}
+                      className="inline-flex items-center gap-2 rounded-pill bg-amber-500 px-5 py-2.5 text-sm font-bold text-ink hover:bg-amber-400 transition-colors"
+                    >
+                      View your deal ticket →
+                    </a>
+                  )}
+                </div>
               )
             )}
           </motion.div>
