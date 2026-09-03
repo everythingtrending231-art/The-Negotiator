@@ -1,6 +1,7 @@
 import { prisma } from "@/server/db"
 import { recordAudit } from "@/server/audit"
 import { sendEmail } from "@/server/email/send"
+import { getSetting } from "@/server/services/settings"
 
 export type CreateSupportInquiryInput = {
   email: string
@@ -34,7 +35,7 @@ export async function createSupportInquiry(input: CreateSupportInquiryInput) {
   })
 
   await sendEmail({
-    to: process.env.SUPPORT_EMAIL ?? "support@example.com",
+    to: await getSetting("supportEmail"),
     template: "support-inquiry",
     data: {
       email: inquiry.email,

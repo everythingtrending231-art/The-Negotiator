@@ -745,6 +745,19 @@ model RateLimitEvent {
   @@index([key, createdAt])
 }
 
+// Admin-editable "system configuration" (docs/02_PRODUCT_REQUIREMENTS.md
+// §6). A plain key/value catalog rather than dedicated columns per
+// setting — the known keys and their labels/descriptions/types live in
+// src/server/services/settings.ts's SETTING_DEFS, not in the schema, so a
+// new setting never needs a migration. A missing row means "use the
+// default from SETTING_DEFS," never a broken read — see getSetting.
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
 // Post-closure feedback (docs/03_CUSTOMER_JOURNEY.md §12) — one row per
 // case, created the moment the closure-summary email fires (same point a
 // terminal status is first reached) so the emailed link works even though

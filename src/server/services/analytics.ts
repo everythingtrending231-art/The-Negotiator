@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client"
 import { prisma } from "@/server/db"
+import { isTerminal } from "@/server/services/cases"
 
 // Basic analytics per docs/16_MEASUREMENT_ANALYTICS.md — only the metrics
 // honestly computable from data this platform already collects. Explicitly
@@ -203,4 +204,56 @@ export async function getNegotiatorAnalytics(negotiatorId: string) {
 
 function hoursBetween(from: Date, to: Date): number {
   return (to.getTime() - from.getTime()) / (1000 * 60 * 60)
+}
+
+// Per-negotiator workload summary for Admin oversight (docs/09's "Negotiators"
+// core area) — casesPerNegotiator on getPlatformAnalytics only counts total
+// assigned cases for negotiators who have any; this covers every negotiator
+// (including inactive ones and ones with zero cases), splits open vs. total,
+// and surfaces escalation/rating signals useful for balancing workload.
+export async function getNegotiatorWorkloads() {
+  const negotiators = await prisma.negotiator.findMany({ orderBy: { name: "asc" } })
+
+  const [caseGroups, escalatedGroups, feedbackRows] = await Promise.all([
+    prisma.negotiationCase.groupBy({
+      by: ["assignedNegotiatorId", "status"],
+      _count: { _all: true },
+      where: { assignedNegotiatorId: { not: null } },
+    }),
+    prisma.negotiationCase.groupBy({
+      by: ["assignedNegotiatorId"],
+      _count: { _all: true },
+      where: { assignedNegotiatorId: { not: null }, escalated: true },
+    }),
+    prisma.feedback.findMany({
+      where: { negotiatorId: { not: null }, submittedAt: { not: null } },
+      select: { negotiatorId: true, negotiatorRating: true },
+    }),
+  ])
+
+  const workloads = negotiators.map((negotiator) => {
+    const statusCounts = caseGroups.filter((g) => g.assignedNegotiatorId === negotiator.id)
+    const totalCaseCount = statusCounts.reduce((sum, g) => sum + g._count._all, 0)
+    const openCaseCount = statusCounts
+      .filter((g) => !isTerminal(g.status))
+      .reduce((sum, g) => sum + g._count._all, 0)
+    const escalatedCount = escalatedGroups.find((g) => g.assignedNegotiatorId === negotiator.id)?._count._all ?? 0
+    const ratings = feedbackRows
+      .filter((f) => f.negotiatorId === negotiator.id)
+      .map((f) => f.negotiatorRating)
+      .filter((r): r is number => r !== null)
+
+    return {
+      id: negotiator.id,
+      name: negotiator.name,
+      email: negotiator.email,
+      active: negotiator.active,
+      totalCaseCount,
+      openCaseCount,
+      escalatedCount,
+      avgRating: average(ratings),
+    }
+  })
+
+  return workloads.sort((a, b) => b.openCaseCount - a.openCaseCount)
 }

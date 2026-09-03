@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { testPrisma } from "@/server/test/db"
 import { createCase, createNegotiator } from "@/server/test/factories"
-import { getNegotiatorAnalytics, getPlatformAnalytics } from "./analytics"
+import { getNegotiatorAnalytics, getNegotiatorWorkloads, getPlatformAnalytics } from "./analytics"
 
 describe("getPlatformAnalytics", () => {
   it("returns all nulls/zeros on an empty database rather than dividing by zero", async () => {
@@ -161,5 +161,65 @@ describe("getNegotiatorAnalytics", () => {
 
     const analytics = await getNegotiatorAnalytics(negotiatorA.id)
     expect(analytics.avgNegotiatorRating).toBe(4)
+  })
+})
+
+describe("getNegotiatorWorkloads", () => {
+  it("includes every negotiator, even inactive ones with zero cases", async () => {
+    const negotiator = await createNegotiator()
+    await testPrisma.negotiator.update({ where: { id: negotiator.id }, data: { active: false } })
+
+    const workloads = await getNegotiatorWorkloads()
+    const row = workloads.find((w) => w.id === negotiator.id)
+    expect(row).toMatchObject({ active: false, totalCaseCount: 0, openCaseCount: 0, escalatedCount: 0, avgRating: null })
+  })
+
+  it("splits open vs. total cases and counts escalations, sorted by open count descending", async () => {
+    const busy = await createNegotiator()
+    const idle = await createNegotiator()
+
+    await createCase({ status: "NEGOTIATING", assignedNegotiatorId: busy.id })
+    await createCase({ status: "NEGOTIATING", assignedNegotiatorId: busy.id })
+    await testPrisma.negotiationCase.updateMany({
+      where: { assignedNegotiatorId: busy.id },
+      data: { escalated: true },
+    })
+    await createCase({ status: "CLOSED", assignedNegotiatorId: busy.id })
+    await createCase({ status: "CLOSED", assignedNegotiatorId: idle.id })
+
+    const workloads = await getNegotiatorWorkloads()
+    const busyRow = workloads.find((w) => w.id === busy.id)
+    const idleRow = workloads.find((w) => w.id === idle.id)
+
+    expect(busyRow).toMatchObject({ totalCaseCount: 3, openCaseCount: 2, escalatedCount: 2 })
+    expect(idleRow).toMatchObject({ totalCaseCount: 1, openCaseCount: 0, escalatedCount: 0 })
+    expect(workloads.findIndex((w) => w.id === busy.id)).toBeLessThan(workloads.findIndex((w) => w.id === idle.id))
+  })
+
+  it("averages only submitted feedback ratings, scoped per negotiator", async () => {
+    const negotiator = await createNegotiator()
+    const otherNegotiator = await createNegotiator()
+    const negotiationCase = await createCase({ assignedNegotiatorId: negotiator.id })
+    const otherCase = await createCase({ assignedNegotiatorId: otherNegotiator.id })
+
+    await testPrisma.feedback.create({
+      data: {
+        caseId: negotiationCase.id,
+        negotiatorId: negotiator.id,
+        tokenHash: "wl-hash-a",
+        submittedAt: new Date(),
+        negotiatorRating: 5,
+        savedMoney: true,
+        improvedDeal: true,
+        wouldUseAgain: true,
+      },
+    })
+    await testPrisma.feedback.create({
+      data: { caseId: otherCase.id, negotiatorId: otherNegotiator.id, tokenHash: "wl-hash-b" }, // issued, unanswered
+    })
+
+    const workloads = await getNegotiatorWorkloads()
+    expect(workloads.find((w) => w.id === negotiator.id)?.avgRating).toBe(5)
+    expect(workloads.find((w) => w.id === otherNegotiator.id)?.avgRating).toBeNull()
   })
 })

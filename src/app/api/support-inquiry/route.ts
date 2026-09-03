@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server"
 import { createSupportInquiry } from "@/server/services/support"
 import { checkRateLimit, getClientIp } from "@/server/services/rate-limit"
+import { getSettingNumber } from "@/server/services/settings"
 
 const MAX_MESSAGE_LENGTH = 2000
 
 export async function POST(request: Request) {
   const allowed = await checkRateLimit(`support-inquiry:${getClientIp(request)}`, {
     windowMs: 60 * 60 * 1000,
-    max: 5,
+    max: await getSettingNumber("supportInquiryRateLimitMax"),
   })
   if (!allowed) {
     return NextResponse.json({ error: "Too many requests — please try again later." }, { status: 429 })

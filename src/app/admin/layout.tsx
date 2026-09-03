@@ -12,11 +12,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         { label: "Analytics", href: "/admin/analytics" },
         { label: "Content", href: "/admin/content" },
         { label: "Cases", href: "/admin/cases" },
+        { label: "Negotiators", href: "/admin/negotiators" },
         { label: "Offers", href: "/admin/offers" },
         { label: "Categories", href: "/admin/categories" },
         { label: "Businesses", href: "/admin/businesses" },
         { label: "Users", href: "/admin/users" },
         { label: "Audit", href: "/admin/audit" },
+        { label: "Settings", href: "/admin/settings" },
         { label: "Dev outbox", href: "/admin/dev/outbox" },
       ]}
     >
