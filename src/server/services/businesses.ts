@@ -302,11 +302,19 @@ export async function createPartnerAgreement(businessId: string, input: PartnerA
   })
 }
 
-// Read-only, computed via aggregates — nothing stored. "Response rate" is
-// approximated by offer-rate since the schema has no dedicated "business
-// responded" event; a proxy, not a precise metric.
+function hoursBetween(from: Date, to: Date): number {
+  return (to.getTime() - from.getTime()) / (1000 * 60 * 60)
+}
+
+// Read-only, computed via aggregates — nothing stored. "Response rate" and
+// "avg response time" are computed from CaseBusinessInvite — a real
+// business-responded event (docs/09 §4's "Partner response rate" /
+// "Average response time") — rather than the offer-rate proxy this used
+// before invites existed. Withdrawn invites are excluded from both: a
+// Negotiator auto-withdrawing an invite (see offers.ts) isn't the business
+// failing to respond.
 export async function computeBusinessPerformanceSummary(businessId: string) {
-  const [casesInvolvedCount, offersCount, acceptedOffersCount, disputedCasesCount, offersWithOriginal] =
+  const [casesInvolvedCount, offersCount, acceptedOffersCount, disputedCasesCount, offersWithOriginal, invites] =
     await Promise.all([
       prisma.negotiationCase.count({ where: { businessId } }),
       prisma.offer.count({ where: { businessId } }),
@@ -316,12 +324,24 @@ export async function computeBusinessPerformanceSummary(businessId: string) {
         where: { businessId, originalValueCents: { not: null } },
         select: { originalValueCents: true, finalPriceCents: true },
       }),
+      prisma.caseBusinessInvite.findMany({
+        where: { businessId, status: { not: "WITHDRAWN" } },
+        select: { createdAt: true, respondedAt: true },
+      }),
     ])
 
   // Same "fetch rows, average in JS" approach as getPlatformAnalytics's
   // avgPriceImprovementCents — not a natural SQL aggregate via Prisma.
   const improvements = offersWithOriginal.map((o) => o.originalValueCents! - o.finalPriceCents)
   const avgValueCreated = improvements.length > 0 ? improvements.reduce((sum, v) => sum + v, 0) / improvements.length : null
+
+  const respondedInvites = invites.filter((i) => i.respondedAt != null)
+  const responseRate = invites.length > 0 ? respondedInvites.length / invites.length : null
+  const avgResponseHours =
+    respondedInvites.length > 0
+      ? respondedInvites.reduce((sum, i) => sum + hoursBetween(i.createdAt, i.respondedAt!), 0) /
+        respondedInvites.length
+      : null
 
   return {
     casesInvolvedCount,
@@ -331,6 +351,9 @@ export async function computeBusinessPerformanceSummary(businessId: string) {
     acceptanceRate: offersCount > 0 ? acceptedOffersCount / offersCount : null,
     disputedCasesCount,
     avgValueCreated,
+    invitesSentCount: invites.length,
+    responseRate,
+    avgResponseHours,
   }
 }
 

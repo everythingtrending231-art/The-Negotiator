@@ -51,6 +51,7 @@ export default async function AdminAnalyticsPage() {
             value={a.avgPriceImprovementCents == null ? "—" : formatCents(a.avgPriceImprovementCents, "USD")}
             hint="Where a Negotiator recorded an original value — one figure among many, not a target"
           />
+          <StatTile label="Escalation rate" value={formatPercent(a.escalationRate)} />
         </div>
       </section>
 
@@ -60,6 +61,11 @@ export default async function AdminAnalyticsPage() {
           <StatTile label="Active partners" value={String(a.activePartners)} />
           <StatTile label="Avg. business confirmation time" value={formatHours(a.avgBusinessConfirmationHours)} />
           <StatTile label="Dispute rate" value={formatPercent(a.disputeRate)} />
+          <StatTile
+            label="Partner retention"
+            value={formatPercent(a.partnerRetentionRate)}
+            hint="Businesses with cases in more than one month"
+          />
         </div>
       </section>
 
