@@ -329,6 +329,13 @@ model NegotiationCase {
   categoryFieldValues   Json?
   estimatedNextUpdateAt DateTime?
 
+  // Customer-uploaded reference photos/files (docs/02 §3: "URL and
+  // image/file attachment"). Public Vercel Blob URLs, uploaded before the
+  // case exists — same "just store the URL" convention as
+  // Business.logoUrl / ContentBlock.mediaUrl, just as an array since a
+  // request can carry more than one file.
+  attachmentUrls String[] @default([])
+
   // Manual negotiator-flagged escalation only (docs/04 §11 lists narrative
   // escalation triggers, but automated threshold-based escalation is
   // blocked on docs/21's "Escalation thresholds: TBD" — this is a plain

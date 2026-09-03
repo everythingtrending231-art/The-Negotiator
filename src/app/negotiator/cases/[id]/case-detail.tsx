@@ -31,6 +31,7 @@ type NegotiationCase = {
   status: string
   description: string
   url: string | null
+  attachmentUrls: string[]
   targetPriceCents: number | null
   maxBudgetCents: number | null
   currency: string
@@ -264,6 +265,21 @@ export default function CaseDetail(props: {
           {c.location && <p>Location: {c.location}</p>}
         </div>
         {c.notes && <p className="text-sm text-ink-muted">Notes: {c.notes}</p>}
+        {c.attachmentUrls.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {c.attachmentUrls.map((url, i) => (
+              <a
+                key={url}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm underline text-cobalt-600"
+              >
+                Attachment {i + 1}
+              </a>
+            ))}
+          </div>
+        )}
         {c.customerPreferredBusinessName && (
           <p className="text-sm text-ink-soft">
             Customer&apos;s pick: {c.customerPreferredBusinessName}{" "}

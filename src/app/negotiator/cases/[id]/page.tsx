@@ -46,6 +46,7 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
         status: negotiationCase.status,
         description: negotiationCase.description,
         url: negotiationCase.url,
+        attachmentUrls: negotiationCase.attachmentUrls,
         targetPriceCents: negotiationCase.targetPriceCents,
         maxBudgetCents: negotiationCase.maxBudgetCents,
         currency: negotiationCase.currency,

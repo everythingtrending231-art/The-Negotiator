@@ -149,6 +149,7 @@ export type CreateCaseInput = {
   notes?: string
   categoryFieldValues?: Record<string, unknown>
   customerPreferredBusinessId?: string
+  attachmentUrls?: string[]
 }
 
 export async function createCase(input: CreateCaseInput) {
@@ -176,6 +177,7 @@ export async function createCase(input: CreateCaseInput) {
             notes: input.notes,
             categoryFieldValues: input.categoryFieldValues as Prisma.InputJsonValue | undefined,
             customerPreferredBusinessId: input.customerPreferredBusinessId,
+            attachmentUrls: input.attachmentUrls ?? [],
           },
         })
         break

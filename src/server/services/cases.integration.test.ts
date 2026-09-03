@@ -51,6 +51,27 @@ describe("createCase", () => {
     // businessId (the binding assignment) is only ever set by createOffer.
     expect(negotiationCase.businessId).toBeNull()
   })
+
+  it("stores customer-uploaded attachment URLs, defaulting to an empty array when none are given", async () => {
+    const category = await createCategory()
+
+    const { negotiationCase: withAttachments } = await createCaseService({
+      email: "customer@example.com",
+      categoryId: category.id,
+      description: "I need a hotel room in Denver.",
+      attachmentUrls: ["https://example.public.blob.vercel-storage.com/request-attachments/a.jpg"],
+    })
+    expect(withAttachments.attachmentUrls).toEqual([
+      "https://example.public.blob.vercel-storage.com/request-attachments/a.jpg",
+    ])
+
+    const { negotiationCase: withoutAttachments } = await createCaseService({
+      email: "customer@example.com",
+      categoryId: category.id,
+      description: "I need a hotel room in Denver.",
+    })
+    expect(withoutAttachments.attachmentUrls).toEqual([])
+  })
 })
 
 describe("assignNegotiator", () => {
