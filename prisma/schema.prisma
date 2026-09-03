@@ -105,7 +105,10 @@ model CategoryField {
   categoryId   String
   category     Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   fieldName    String
-  fieldType    String // "text" | "number" | "date" | "select" — Phase 1 renders a plain input for every type
+  fieldType    String // "text" | "number" | "date" | "select" — the request form renders a type-appropriate input for each
+  // The customer-facing choice list for "select" fields — ignored for
+  // every other fieldType.
+  fieldOptions String[] @default([])
   required     Boolean  @default(false)
   displayOrder Int      @default(0)
 

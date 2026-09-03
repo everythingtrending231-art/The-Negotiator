@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/form"
 import NegotiatorMark from "@/components/negotiator-mark"
 
-type CategoryField = { id: string; fieldName: string; fieldType: string; required: boolean }
+type CategoryField = { id: string; fieldName: string; fieldType: string; required: boolean; fieldOptions: string[] }
 type CategoryBusiness = { id: string; name: string; logoUrl: string | null; description: string | null }
 type Category = { id: string; name: string; fields: CategoryField[]; businesses: CategoryBusiness[] }
 
@@ -393,13 +393,35 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
                         {field.fieldName}
                         {field.required ? " *" : ""}
                       </Label>
-                      <Input
-                        id={`cf-${field.id}`}
-                        value={categoryFieldValues[field.id] ?? ""}
-                        onChange={(event) =>
-                          setCategoryFieldValues((prev) => ({ ...prev, [field.id]: event.target.value }))
-                        }
-                      />
+                      {field.fieldType === "select" ? (
+                        <Select
+                          value={categoryFieldValues[field.id] ?? ""}
+                          onValueChange={(value) =>
+                            setCategoryFieldValues((prev) => ({ ...prev, [field.id]: value }))
+                          }
+                        >
+                          <SelectTrigger id={`cf-${field.id}`}>
+                            <SelectValue placeholder="Choose one" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {field.fieldOptions.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          id={`cf-${field.id}`}
+                          type={field.fieldType === "date" ? "date" : field.fieldType === "number" ? "number" : "text"}
+                          inputMode={field.fieldType === "number" ? "decimal" : undefined}
+                          value={categoryFieldValues[field.id] ?? ""}
+                          onChange={(event) =>
+                            setCategoryFieldValues((prev) => ({ ...prev, [field.id]: event.target.value }))
+                          }
+                        />
+                      )}
                     </motion.div>
                   ))}
                 </div>

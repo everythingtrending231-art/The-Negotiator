@@ -110,4 +110,22 @@ describe("category fields", () => {
 
     expect(second.displayOrder).toBe(1)
   })
+
+  it("stores and updates fieldOptions for a select field, defaulting to empty for other types", async () => {
+    const admin = await actor()
+    const category = await createCategoryFixture()
+
+    const textField = await addCategoryField(category.id, { fieldName: "Notes", fieldType: "text", required: false }, admin)
+    expect(textField.fieldOptions).toEqual([])
+
+    const selectField = await addCategoryField(
+      category.id,
+      { fieldName: "Room type", fieldType: "select", required: false, fieldOptions: ["Standard", "Suite"] },
+      admin,
+    )
+    expect(selectField.fieldOptions).toEqual(["Standard", "Suite"])
+
+    const updated = await updateCategoryField(selectField.id, { fieldOptions: ["Standard", "Suite", "Penthouse"] }, admin)
+    expect(updated.fieldOptions).toEqual(["Standard", "Suite", "Penthouse"])
+  })
 })

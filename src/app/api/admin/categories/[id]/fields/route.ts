@@ -11,11 +11,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const fieldName = typeof body?.fieldName === "string" ? body.fieldName.trim() : ""
   const fieldType = typeof body?.fieldType === "string" ? body.fieldType : "text"
   const required = typeof body?.required === "boolean" ? body.required : false
+  const fieldOptions = Array.isArray(body?.fieldOptions)
+    ? body.fieldOptions.filter((o: unknown): o is string => typeof o === "string" && o.trim().length > 0)
+    : undefined
 
   if (!fieldName) {
     return NextResponse.json({ error: "fieldName is required" }, { status: 400 })
   }
 
-  const field = await addCategoryField(id, { fieldName, fieldType, required }, auth.session)
+  const field = await addCategoryField(id, { fieldName, fieldType, required, fieldOptions }, auth.session)
   return NextResponse.json({ field }, { status: 201 })
 }

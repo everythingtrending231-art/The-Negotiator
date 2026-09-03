@@ -37,6 +37,7 @@ export default async function AdminCategoryDetailPage({ params }: { params: Prom
         fieldName: f.fieldName,
         fieldType: f.fieldType,
         required: f.required,
+        fieldOptions: f.fieldOptions,
       }))}
       businesses={category.businesses.map((bc) => ({ id: bc.business.id, name: bc.business.name }))}
       auditLogs={auditLogs.map((a) => ({
