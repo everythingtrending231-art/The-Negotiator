@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import StatusBadge from "@/components/status-badge"
@@ -51,6 +52,18 @@ type Feedback = {
   negotiatorRating: number | null
   wouldUseAgain: boolean | null
 } | null
+type DisputeNote = { id: string; authorType: string; body: string; createdAt: string }
+type Dispute = {
+  id: string
+  status: "OPEN" | "RESOLVED"
+  reason: string
+  raisedByType: string
+  resolution: string | null
+  resolvedAt: string | null
+  resolvedByType: string | null
+  createdAt: string
+  notes: DisputeNote[]
+}
 
 export default function AdminCaseDetail(props: {
   negotiationCase: NegotiationCase
@@ -60,6 +73,7 @@ export default function AdminCaseDetail(props: {
   offers: Offer[]
   auditLogs: AuditLogRow[]
   feedback: Feedback
+  disputes: Dispute[]
 }) {
   const router = useRouter()
   const c = props.negotiationCase
@@ -67,9 +81,71 @@ export default function AdminCaseDetail(props: {
   const [reassignTo, setReassignTo] = useState(c.assignedNegotiatorId ?? props.negotiators[0]?.id ?? "")
   const [forceCloseReason, setForceCloseReason] = useState("")
   const [busy, setBusy] = useState(false)
+  const [showDisputeForm, setShowDisputeForm] = useState(false)
+  const [disputeReason, setDisputeReason] = useState("")
+  const [disputeNoteBody, setDisputeNoteBody] = useState<Record<string, string>>({})
+  const [disputeResolution, setDisputeResolution] = useState<Record<string, string>>({})
 
   const reassignConfirm = useConfirmDialog()
   const forceCloseConfirm = useConfirmDialog()
+
+  async function openDisputeAction() {
+    if (!disputeReason.trim()) return
+    setBusy(true)
+    const res = await fetch(`/api/admin/cases/${c.id}/dispute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: disputeReason }),
+    })
+    setBusy(false)
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      toast.error(body?.error ?? "Couldn't open a dispute.")
+      return
+    }
+    toast.success("Dispute opened.")
+    setDisputeReason("")
+    setShowDisputeForm(false)
+    router.refresh()
+  }
+
+  async function addDisputeNoteAction(disputeId: string) {
+    const body = disputeNoteBody[disputeId]?.trim()
+    if (!body) return
+    setBusy(true)
+    const res = await fetch(`/api/admin/cases/${c.id}/dispute/${disputeId}/note`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body }),
+    })
+    setBusy(false)
+    if (!res.ok) {
+      toast.error("Couldn't add that note.")
+      return
+    }
+    toast.success("Note added.")
+    setDisputeNoteBody((prev) => ({ ...prev, [disputeId]: "" }))
+    router.refresh()
+  }
+
+  async function resolveDisputeAction(disputeId: string) {
+    const resolution = disputeResolution[disputeId]?.trim()
+    if (!resolution) return
+    setBusy(true)
+    const res = await fetch(`/api/admin/cases/${c.id}/dispute/${disputeId}/resolve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resolution }),
+    })
+    setBusy(false)
+    if (!res.ok) {
+      toast.error("Couldn't resolve this dispute.")
+      return
+    }
+    toast.success("Dispute resolved.")
+    setDisputeResolution((prev) => ({ ...prev, [disputeId]: "" }))
+    router.refresh()
+  }
 
   async function reassign() {
     setBusy(true)
@@ -208,6 +284,9 @@ export default function AdminCaseDetail(props: {
         <TabsList>
           <TabsTrigger value="offers">Offers ({props.offers.length})</TabsTrigger>
           <TabsTrigger value="conversation">Messages &amp; notes</TabsTrigger>
+          <TabsTrigger value="disputes">
+            Disputes{props.disputes.some((d) => d.status === "OPEN") ? " ⚠" : ""}
+          </TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
           <TabsTrigger value="audit">Audit</TabsTrigger>
         </TabsList>
@@ -285,6 +364,107 @@ export default function AdminCaseDetail(props: {
               })}
             </div>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="disputes" className="space-y-4">
+          {props.disputes.length === 0 && (
+            <Card className="p-6">
+              <p className="text-sm text-ink-muted">No disputes on this case.</p>
+            </Card>
+          )}
+
+          {props.disputes.map((dispute) => (
+            <Card key={dispute.id} className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <Badge variant={dispute.status === "OPEN" ? "danger" : "outline"}>{dispute.status}</Badge>
+                <p className="text-xs text-ink-muted">
+                  Opened by {dispute.raisedByType} · {new Date(dispute.createdAt).toLocaleString()}
+                </p>
+              </div>
+              <p className="text-sm">{dispute.reason}</p>
+
+              {dispute.notes.length > 0 && (
+                <div className="space-y-2 border-t border-border pt-3">
+                  {dispute.notes.map((n) => (
+                    <div key={n.id} className="bg-amber-50 rounded-lg p-3">
+                      <p className="text-xs text-ink-muted">
+                        {n.authorType} · {new Date(n.createdAt).toLocaleString()}
+                      </p>
+                      <p className="text-sm">{n.body}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {dispute.status === "RESOLVED" ? (
+                <div className="border-t border-border pt-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-ink-muted">
+                    Resolved by {dispute.resolvedByType} ·{" "}
+                    {dispute.resolvedAt && new Date(dispute.resolvedAt).toLocaleString()}
+                  </p>
+                  <p className="text-sm">{dispute.resolution}</p>
+                </div>
+              ) : (
+                <div className="space-y-3 border-t border-border pt-3">
+                  <Textarea
+                    rows={2}
+                    placeholder="Add evidence or a note to the record…"
+                    value={disputeNoteBody[dispute.id] ?? ""}
+                    onChange={(e) => setDisputeNoteBody((prev) => ({ ...prev, [dispute.id]: e.target.value }))}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy || !disputeNoteBody[dispute.id]?.trim()}
+                    onClick={() => addDisputeNoteAction(dispute.id)}
+                  >
+                    Add note
+                  </Button>
+
+                  <Textarea
+                    rows={2}
+                    placeholder="Resolution summary — what happened, what was done…"
+                    value={disputeResolution[dispute.id] ?? ""}
+                    onChange={(e) => setDisputeResolution((prev) => ({ ...prev, [dispute.id]: e.target.value }))}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={busy || !disputeResolution[dispute.id]?.trim()}
+                    onClick={() => resolveDisputeAction(dispute.id)}
+                  >
+                    Mark resolved
+                  </Button>
+                </div>
+              )}
+            </Card>
+          ))}
+
+          {!props.disputes.some((d) => d.status === "OPEN") && (
+            <Card className="p-6 space-y-3">
+              {showDisputeForm ? (
+                <>
+                  <Textarea
+                    rows={3}
+                    placeholder="What's being disputed?"
+                    value={disputeReason}
+                    onChange={(e) => setDisputeReason(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="destructive" disabled={busy || !disputeReason.trim()} onClick={openDisputeAction}>
+                      Confirm dispute
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setShowDisputeForm(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <Button size="sm" variant="outline" onClick={() => setShowDisputeForm(true)}>
+                  Open a dispute
+                </Button>
+              )}
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="feedback">

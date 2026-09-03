@@ -22,6 +22,7 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
       auditLogs: { orderBy: { createdAt: "desc" }, take: 50 },
       invites: { orderBy: { createdAt: "desc" }, include: { business: true, respondedByContact: true } },
       feedback: true,
+      disputes: { orderBy: { createdAt: "desc" }, include: { notes: { orderBy: { createdAt: "asc" } } } },
     },
   })
 
@@ -101,6 +102,22 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
         responseNote: i.responseNote,
         respondedByName: i.respondedByContact?.name ?? null,
         respondedAt: i.respondedAt?.toISOString() ?? null,
+      }))}
+      disputes={negotiationCase.disputes.map((d) => ({
+        id: d.id,
+        status: d.status,
+        reason: d.reason,
+        raisedByType: d.raisedByType,
+        resolution: d.resolution,
+        resolvedAt: d.resolvedAt?.toISOString() ?? null,
+        resolvedByType: d.resolvedByType,
+        createdAt: d.createdAt.toISOString(),
+        notes: d.notes.map((n) => ({
+          id: n.id,
+          authorType: n.authorType,
+          body: n.body,
+          createdAt: n.createdAt.toISOString(),
+        })),
       }))}
       currentNegotiator={{ id: negotiatorId, name: session.name }}
       businesses={businesses.map((b) => ({ id: b.id, name: b.name }))}
