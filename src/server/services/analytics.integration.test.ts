@@ -13,6 +13,27 @@ describe("getPlatformAnalytics", () => {
     expect(analytics.disputeRate).toBeNull()
     expect(analytics.closedDealsCount).toBe(0)
     expect(analytics.totalDealValueCents).toBe(0)
+    expect(analytics.feedbackResponseRate).toBeNull()
+    expect(analytics.avgNegotiatorRating).toBeNull()
+  })
+
+  it("computes feedback response rate and averages only from submitted responses", async () => {
+    const caseA = await createCase()
+    const caseB = await createCase()
+    await createCase() // no feedback issued at all — shouldn't affect the rate
+
+    await testPrisma.feedback.create({
+      data: { caseId: caseA.id, tokenHash: "hash-a", submittedAt: new Date(), savedMoney: true, improvedDeal: true, negotiatorRating: 5, wouldUseAgain: true },
+    })
+    await testPrisma.feedback.create({
+      data: { caseId: caseB.id, tokenHash: "hash-b" }, // issued, never answered
+    })
+
+    const analytics = await getPlatformAnalytics()
+    expect(analytics.feedbackResponseRate).toBe(0.5) // 1 of 2 issued tokens answered
+    expect(analytics.avgNegotiatorRating).toBe(5)
+    expect(analytics.savedMoneyRate).toBe(1)
+    expect(analytics.wouldUseAgainRate).toBe(1)
   })
 
   it("computes acceptance rate, deal value totals, and cases-per-negotiator from real rows", async () => {
@@ -104,5 +125,41 @@ describe("getNegotiatorAnalytics", () => {
     expect(analytics.totalCases).toBe(0)
     expect(analytics.acceptanceRate).toBeNull()
     expect(analytics.avgNegotiationDurationHours).toBeNull()
+    expect(analytics.avgNegotiatorRating).toBeNull()
+  })
+
+  it("scopes feedback metrics to the given negotiator only", async () => {
+    const negotiatorA = await createNegotiator()
+    const negotiatorB = await createNegotiator()
+    const caseA = await createCase({ assignedNegotiatorId: negotiatorA.id })
+    const caseB = await createCase({ assignedNegotiatorId: negotiatorB.id })
+
+    await testPrisma.feedback.create({
+      data: {
+        caseId: caseA.id,
+        negotiatorId: negotiatorA.id,
+        tokenHash: "hash-a",
+        submittedAt: new Date(),
+        negotiatorRating: 4,
+        savedMoney: true,
+        improvedDeal: true,
+        wouldUseAgain: true,
+      },
+    })
+    await testPrisma.feedback.create({
+      data: {
+        caseId: caseB.id,
+        negotiatorId: negotiatorB.id,
+        tokenHash: "hash-b",
+        submittedAt: new Date(),
+        negotiatorRating: 1,
+        savedMoney: false,
+        improvedDeal: false,
+        wouldUseAgain: false,
+      },
+    })
+
+    const analytics = await getNegotiatorAnalytics(negotiatorA.id)
+    expect(analytics.avgNegotiatorRating).toBe(4)
   })
 })

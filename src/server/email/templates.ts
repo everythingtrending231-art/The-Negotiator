@@ -27,6 +27,7 @@ export type ClosureSummaryData = {
     businessName?: string | null
   } | null
   supportEmail: string
+  feedbackUrl?: string | null
 }
 
 export type OfferReadyData = {
@@ -96,6 +97,7 @@ export function closureSummaryEmail(data: ClosureSummaryData) {
       <p>Your negotiation ticket <strong>${data.caseRef}</strong> is now <strong>${data.status}</strong>.</p>
       ${offerHtml}
       <p>This is your one-time record — the dashboard link for this case is no longer active.</p>
+      ${data.feedbackUrl ? `<p>Got a minute? <a href="${data.feedbackUrl}">Tell us how it went</a> — it helps us improve.</p>` : ""}
       <p>Questions? Reach us at <a href="mailto:${data.supportEmail}">${data.supportEmail}</a>.</p>
     `,
   }

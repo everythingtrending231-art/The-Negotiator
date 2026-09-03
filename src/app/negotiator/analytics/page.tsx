@@ -34,6 +34,19 @@ export default async function NegotiatorAnalyticsPage() {
           ))}
         </div>
       </Card>
+
+      <div>
+        <h2 className="text-sm font-bold text-ink-muted uppercase tracking-wide mb-3">Customer feedback</h2>
+        <p className="text-xs text-ink-muted mb-3">
+          From the post-closure survey — self-reported, and only from customers who responded.
+        </p>
+        <StatTileGrid className="grid-cols-2 sm:grid-cols-4">
+          <StatTile label="Response rate" value={formatPercent(a.feedbackResponseRate)} />
+          <StatTile label="Your rating" value={a.avgNegotiatorRating == null ? "—" : `${formatNumber(a.avgNegotiatorRating)} / 5`} />
+          <StatTile label="Saved money" value={formatPercent(a.savedMoneyRate)} />
+          <StatTile label="Would use again" value={formatPercent(a.wouldUseAgainRate)} />
+        </StatTileGrid>
+      </div>
     </div>
   )
 }

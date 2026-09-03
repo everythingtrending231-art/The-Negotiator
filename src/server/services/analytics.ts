@@ -1,13 +1,15 @@
+import type { Prisma } from "@prisma/client"
 import { prisma } from "@/server/db"
 
 // Basic analytics per docs/16_MEASUREMENT_ANALYTICS.md — only the metrics
 // honestly computable from data this platform already collects. Explicitly
 // NOT included (flagged, not silently dropped — CLAUDE.md rule 6): all of
-// §5 Financial Metrics (need Transaction/Payment, Phase 3), customer
-// satisfaction/referral rate/partner retention (need review/referral/
-// cohort tracking that was never built), and §6 Quality Metrics
-// (documentation completeness, unauthorized commitments, complaints,
-// escalations — no tracking mechanism exists for any of these).
+// §5 Financial Metrics (need Transaction/Payment, Phase 3), referral rate/
+// partner retention (need referral/cohort tracking that was never built),
+// and §6 Quality Metrics (documentation completeness, unauthorized
+// commitments, complaints, escalations — no tracking mechanism exists for
+// any of these). Customer satisfaction *is* now trackable, via the
+// post-closure Feedback flow (docs/03 §12, src/server/services/feedback.ts).
 //
 // Duration/rounds/price-improvement aren't natural SQL aggregates against
 // SQLite via Prisma, so those fetch the relevant rows and average in JS —
@@ -15,6 +17,36 @@ import { prisma } from "@/server/db"
 
 function average(values: number[]): number | null {
   return values.length > 0 ? values.reduce((sum, v) => sum + v, 0) / values.length : null
+}
+
+function rateOf(values: (boolean | null)[]): number | null {
+  const answered = values.filter((v): v is boolean => v !== null)
+  return answered.length > 0 ? answered.filter(Boolean).length / answered.length : null
+}
+
+// Shared by getPlatformAnalytics (no filter) and getNegotiatorAnalytics
+// (scoped to one negotiatorId) — a Feedback row exists from the moment the
+// token is issued at closure (see feedback.ts), so `issued` counts every
+// case that reached closure while `submitted` counts only the ones a
+// customer actually answered; the ratio is the response rate.
+async function feedbackSummary(where: Prisma.FeedbackWhereInput) {
+  const [issued, submitted] = await Promise.all([
+    prisma.feedback.count({ where }),
+    prisma.feedback.findMany({
+      where: { ...where, submittedAt: { not: null } },
+      select: { savedMoney: true, improvedDeal: true, negotiatorRating: true, wouldUseAgain: true },
+    }),
+  ])
+
+  return {
+    feedbackResponseRate: issued > 0 ? submitted.length / issued : null,
+    avgNegotiatorRating: average(
+      submitted.map((f) => f.negotiatorRating).filter((r): r is number => r !== null),
+    ),
+    savedMoneyRate: rateOf(submitted.map((f) => f.savedMoney)),
+    improvedDealRate: rateOf(submitted.map((f) => f.improvedDeal)),
+    wouldUseAgainRate: rateOf(submitted.map((f) => f.wouldUseAgain)),
+  }
 }
 
 export async function getPlatformAnalytics() {
@@ -106,6 +138,8 @@ export async function getPlatformAnalytics() {
   const totalDealValueCents = acceptedOfferValues.reduce((sum, o) => sum + o.finalPriceCents, 0)
   const avgDealValueCents = closedDealsCount > 0 ? totalDealValueCents / closedDealsCount : null
 
+  const feedback = await feedbackSummary({})
+
   return {
     requestsSubmitted,
     requestsQualified,
@@ -123,6 +157,7 @@ export async function getPlatformAnalytics() {
     closedDealsCount,
     totalDealValueCents,
     avgDealValueCents,
+    ...feedback,
   }
 }
 
@@ -154,12 +189,15 @@ export async function getNegotiatorAnalytics(negotiatorId: string) {
   })
   const avgRoundsPerCase = average(offersByCase.map((g) => g._count._all))
 
+  const feedback = await feedbackSummary({ negotiatorId })
+
   return {
     totalCases,
     casesByStatus: casesByStatus.map((g) => ({ status: g.status, count: g._count._all })),
     acceptanceRate: decidedOffers > 0 ? acceptedOffers / decidedOffers : null,
     avgNegotiationDurationHours,
     avgRoundsPerCase,
+    ...feedback,
   }
 }
 

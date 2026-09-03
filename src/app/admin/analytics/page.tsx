@@ -24,7 +24,8 @@ export default async function AdminAnalyticsPage() {
         <p className="text-sm text-ink-muted">
           Basic metrics per docs/16 — only what&apos;s honestly computable from real case/offer data today. Deal
           value below is not revenue — no fee/pricing model exists yet (every payment mechanic is marked TBD in
-          docs/21_OPEN_DECISIONS.md). No satisfaction/complaint metrics either (never tracked).
+          docs/21_OPEN_DECISIONS.md). No complaint metrics (never tracked) — customer feedback below is
+          self-reported and only from customers who chose to respond.
         </p>
       </div>
 
@@ -75,6 +76,20 @@ export default async function AdminAnalyticsPage() {
             label="Avg. deal value"
             value={a.avgDealValueCents == null ? "—" : formatCents(a.avgDealValueCents, "USD")}
           />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-bold text-ink-muted uppercase tracking-wide">Customer feedback</h2>
+        <p className="text-xs text-ink-muted">
+          From the post-closure survey (docs/03 §12) — self-reported, and only from customers who responded.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+          <StatTile label="Response rate" value={formatPercent(a.feedbackResponseRate)} hint="Of closed cases" />
+          <StatTile label="Avg. Negotiator rating" value={a.avgNegotiatorRating == null ? "—" : `${formatNumber(a.avgNegotiatorRating)} / 5`} />
+          <StatTile label="Saved money" value={formatPercent(a.savedMoneyRate)} />
+          <StatTile label="Improved the deal" value={formatPercent(a.improvedDealRate)} />
+          <StatTile label="Would use again" value={formatPercent(a.wouldUseAgainRate)} />
         </div>
       </section>
 
