@@ -26,11 +26,30 @@ const lora = Lora({
   display: "swap",
 })
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+const TITLE = "The Negotiator"
+const DESCRIPTION = "You ask. We negotiate. Tell us what you're trying to buy, book, or get — your Negotiator goes to work on it."
+
 export const metadata: Metadata = {
-  title: "The Negotiator",
-  description: "You ask. We negotiate.",
+  metadataBase: new URL(APP_URL),
+  title: TITLE,
+  description: DESCRIPTION,
   icons: {
     icon: "/favicon.svg",
+  },
+  // opengraph-image.tsx (sibling file) is auto-detected by Next.js and
+  // merged into this — no image field needed here.
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: APP_URL,
+    siteName: TITLE,
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
   },
 }
 
