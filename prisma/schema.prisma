@@ -445,8 +445,11 @@ model AccessToken {
   @@index([ticketId])
 }
 
-// Optional persistent account (never required — see PRD §6a). Stub table
-// only in Phase 1: no linking UI/flow yet.
+// Optional persistent account (never required — see PRD §6a). Resolves
+// docs/21_OPEN_DECISIONS.md's "where this is surfaced" question: offered
+// from the live case dashboard and the closure-summary email, never on
+// the request form — additive and skippable per docs/11 §6b, not a
+// blocker to submitting or tracking a single request.
 model CustomerAccount {
   id    String @id @default(cuid())
   email String @unique
@@ -454,6 +457,27 @@ model CustomerAccount {
   createdAt DateTime @default(now())
 
   tickets NegotiationTicket[]
+  tokens  CustomerAccountToken[]
+}
+
+// Passwordless login for CustomerAccount — same magic-link mechanism as
+// AccessToken, but a distinct model/trust boundary: this grants an
+// account-wide session (many tickets), not access to one case. Strictly
+// single-use (revoked the moment it's verified) since it establishes a
+// long-lived session cookie rather than being the access mechanism
+// itself on every visit, unlike AccessToken's reusable-until-resend model.
+model CustomerAccountToken {
+  id                String          @id @default(cuid())
+  customerAccountId String
+  customerAccount   CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+
+  tokenHash String   @unique
+  issuedAt  DateTime @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+  revokedAt DateTime?
+
+  @@index([customerAccountId])
 }
 
 // ---------------------------------------------------------------------------

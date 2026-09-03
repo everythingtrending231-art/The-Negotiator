@@ -8,6 +8,7 @@ export type SettingKey =
   | "requestRateLimitMax"
   | "loginRateLimitMax"
   | "supportInquiryRateLimitMax"
+  | "accountLoginRateLimitMax"
 
 type SettingDef = {
   key: SettingKey
@@ -48,6 +49,13 @@ export const SETTING_DEFS: SettingDef[] = [
     key: "supportInquiryRateLimitMax",
     label: "Support messages per hour (per IP)",
     description: "Max /api/support-inquiry submissions allowed from one IP address per hour.",
+    type: "number",
+    default: "5",
+  },
+  {
+    key: "accountLoginRateLimitMax",
+    label: "Account login-link requests per hour (per IP)",
+    description: "Max /api/account/request-link submissions allowed from one IP address per hour.",
     type: "number",
     default: "5",
   },

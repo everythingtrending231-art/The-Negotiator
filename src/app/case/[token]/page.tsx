@@ -31,6 +31,7 @@ export default async function CasePage({ params }: { params: Promise<{ token: st
       status={negotiationCase.status}
       negotiatorName={negotiationCase.assignedNegotiator?.name ?? null}
       estimatedNextUpdateAt={negotiationCase.estimatedNextUpdateAt?.toISOString() ?? null}
+      customerEmail={ticket.customerEmail}
       messages={negotiationCase.messages.map((message) => ({
         id: message.id,
         authorType: message.authorType,

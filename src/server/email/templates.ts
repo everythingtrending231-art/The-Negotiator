@@ -17,6 +17,11 @@ export type MagicLinkResendData = {
   magicLinkUrl: string
 }
 
+export type AccountMagicLinkData = {
+  magicLinkUrl: string
+  isNew: boolean
+}
+
 export type ClosureSummaryData = {
   caseRef: string
   status: string
@@ -28,6 +33,7 @@ export type ClosureSummaryData = {
   } | null
   supportEmail: string
   feedbackUrl?: string | null
+  accountUrl: string
 }
 
 export type OfferReadyData = {
@@ -84,6 +90,17 @@ export function magicLinkResendEmail(data: MagicLinkResendData) {
   }
 }
 
+export function accountMagicLinkEmail(data: AccountMagicLinkData) {
+  return {
+    subject: data.isNew ? "Confirm your account" : "Your account sign-in link",
+    html: `
+      <p>${data.isNew ? "Click below to confirm your account and see your requests in one place." : "Here's your sign-in link:"}</p>
+      <p><a href="${data.magicLinkUrl}">${data.magicLinkUrl}</a></p>
+      <p>This link works once and expires in an hour. If you didn't request this, you can ignore this email.</p>
+    `,
+  }
+}
+
 export function closureSummaryEmail(data: ClosureSummaryData) {
   const offerHtml = data.offerSummary
     ? `<p>Final terms: ${formatCents(data.offerSummary.finalPriceCents, data.offerSummary.currency)} — ${escapeHtml(
@@ -98,6 +115,7 @@ export function closureSummaryEmail(data: ClosureSummaryData) {
       ${offerHtml}
       <p>This is your one-time record — the dashboard link for this case is no longer active.</p>
       ${data.feedbackUrl ? `<p>Got a minute? <a href="${data.feedbackUrl}">Tell us how it went</a> — it helps us improve.</p>` : ""}
+      <p>Want to track future requests in one place? <a href="${data.accountUrl}">Create a free account</a> — enter this email to get started.</p>
       <p>Questions? Reach us at <a href="mailto:${data.supportEmail}">${data.supportEmail}</a>.</p>
     `,
   }
