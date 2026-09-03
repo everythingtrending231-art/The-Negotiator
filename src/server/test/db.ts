@@ -29,6 +29,7 @@ const ALL_TABLES = [
   "ContentBlock",
   "SupportInquiry",
   "RateLimitEvent",
+  "SystemSetting",
 ]
 
 // resetDb() is destructive (truncates every table) and integration tests

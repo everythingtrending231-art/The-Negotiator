@@ -14,13 +14,14 @@ import type { CaseStatus, Prisma } from "@prisma/client"
 export default async function AdminCasesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; escalated?: string; q?: string }>
+  searchParams: Promise<{ status?: string; escalated?: string; q?: string; negotiatorId?: string }>
 }) {
-  const { status, escalated, q } = await searchParams
+  const { status, escalated, q, negotiatorId } = await searchParams
 
   const where: Prisma.NegotiationCaseWhereInput = {}
   if (status) where.status = status as CaseStatus
   if (escalated === "1") where.escalated = true
+  if (negotiatorId) where.assignedNegotiatorId = negotiatorId
   if (q?.trim()) {
     const query = q.trim()
     where.OR = [
@@ -30,12 +31,15 @@ export default async function AdminCasesPage({
     ]
   }
 
-  const cases = await prisma.negotiationCase.findMany({
-    where,
-    orderBy: { updatedAt: "desc" },
-    take: 100,
-    include: { category: true, business: true, assignedNegotiator: true },
-  })
+  const [cases, filteredNegotiator] = await Promise.all([
+    prisma.negotiationCase.findMany({
+      where,
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+      include: { category: true, business: true, assignedNegotiator: true },
+    }),
+    negotiatorId ? prisma.negotiator.findUnique({ where: { id: negotiatorId }, select: { name: true } }) : null,
+  ])
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-6">
@@ -50,12 +54,27 @@ export default async function AdminCasesPage({
             query: {
               ...(status ? { status } : {}),
               ...(q?.trim() ? { q: q.trim() } : {}),
+              ...(negotiatorId ? { negotiatorId } : {}),
               escalated: escalated === "1" ? undefined : "1",
             },
           }}
         >
           <Badge variant={escalated === "1" ? "danger" : "outline"}>Escalated only</Badge>
         </Link>
+        {negotiatorId && (
+          <Link
+            href={{
+              pathname: "/admin/cases",
+              query: {
+                ...(status ? { status } : {}),
+                ...(q?.trim() ? { q: q.trim() } : {}),
+                ...(escalated === "1" ? { escalated: "1" } : {}),
+              },
+            }}
+          >
+            <Badge variant="cobalt">{filteredNegotiator?.name ?? "This negotiator"} only ✕</Badge>
+          </Link>
+        )}
       </div>
 
       <Card className="p-0 overflow-hidden">

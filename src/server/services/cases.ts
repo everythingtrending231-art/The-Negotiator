@@ -4,6 +4,7 @@ import { recordAudit } from "@/server/audit"
 import { issueAccessToken, revokeTicketTokens, buildCaseUrl } from "@/server/services/tokens"
 import { buildFeedbackUrl, issueFeedbackToken } from "@/server/services/feedback"
 import { sendEmail } from "@/server/email/send"
+import { getSetting } from "@/server/services/settings"
 
 // PRD §7 names these five as terminal (they trigger dashboard-access
 // closure per §6a). Completed/Disputed are treated as non-terminal
@@ -89,6 +90,7 @@ async function sendClosureSummaryEmail(caseId: string) {
   // ask can piggyback on the closure email instead of needing its own
   // separate trigger/send (docs/03 §12).
   const feedbackToken = await issueFeedbackToken(caseId, negotiationCase.assignedNegotiatorId)
+  const supportEmail = await getSetting("supportEmail")
 
   await sendEmail({
     to: negotiationCase.ticket.customerEmail,
@@ -104,7 +106,7 @@ async function sendClosureSummaryEmail(caseId: string) {
             businessName: negotiationCase.business?.name,
           }
         : null,
-      supportEmail: process.env.SUPPORT_EMAIL ?? "support@example.com",
+      supportEmail,
       feedbackUrl: buildFeedbackUrl(feedbackToken),
     },
   })

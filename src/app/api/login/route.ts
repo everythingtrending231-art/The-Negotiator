@@ -5,6 +5,7 @@ import { recordAudit } from "@/server/audit"
 import { verifyPassword } from "@/server/auth/password"
 import { createSessionToken, SESSION_COOKIE } from "@/server/auth/session"
 import { checkRateLimit, getClientIp } from "@/server/services/rate-limit"
+import { getSettingNumber } from "@/server/services/settings"
 
 // A hash of a value nobody will ever type, used to keep verifyPassword's
 // timing the same whether or not the email matched a real user — a basic
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
   // submitting their address.
   const allowed = await checkRateLimit(`login:${getClientIp(request)}`, {
     windowMs: 15 * 60 * 1000,
-    max: 10,
+    max: await getSettingNumber("loginRateLimitMax"),
   })
   if (!allowed) {
     return NextResponse.json({ error: "Too many login attempts — please try again later." }, { status: 429 })

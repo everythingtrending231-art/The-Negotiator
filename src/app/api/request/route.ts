@@ -3,11 +3,12 @@ import { prisma } from "@/server/db"
 import { createCase } from "@/server/services/cases"
 import { dollarsToCents } from "@/lib/money"
 import { checkRateLimit, getClientIp } from "@/server/services/rate-limit"
+import { getSettingNumber } from "@/server/services/settings"
 
 export async function POST(request: Request) {
   const allowed = await checkRateLimit(`request:${getClientIp(request)}`, {
     windowMs: 60 * 60 * 1000,
-    max: 5,
+    max: await getSettingNumber("requestRateLimitMax"),
   })
   if (!allowed) {
     return NextResponse.json({ error: "Too many requests — please try again later." }, { status: 429 })
