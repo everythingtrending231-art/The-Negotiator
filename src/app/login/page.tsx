@@ -27,7 +27,8 @@ export default function LoginPage() {
     setSubmitting(false)
 
     if (!res.ok) {
-      setError("Incorrect email or password.")
+      const body = await res.json().catch(() => null)
+      setError(res.status === 429 ? body?.error ?? "Too many attempts — try again later." : "Incorrect email or password.")
       return
     }
 

@@ -665,3 +665,18 @@ model SupportInquiry {
   sourcePage String
   createdAt  DateTime @default(now())
 }
+
+// Backs checkRateLimit (src/server/services/rate-limit.ts) — a generic,
+// DB-backed counter for unauthenticated public routes (/api/request,
+// /api/login, /api/support-inquiry). No Redis/KV in this stack, and
+// serverless functions can't trust in-memory state across invocations, so
+// Postgres is the only reliable shared counter available. Self-cleaning:
+// checkRateLimit deletes a key's own stale rows on every check rather than
+// needing a separate cron/prune job.
+model RateLimitEvent {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}

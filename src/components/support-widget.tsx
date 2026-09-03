@@ -41,7 +41,8 @@ export default function SupportWidget() {
     })
     setSending(false)
     if (!res.ok) {
-      toast.error("Couldn't send that — please try again.")
+      const body = await res.json().catch(() => null)
+      toast.error(body?.error ?? "Couldn't send that — please try again.")
       return
     }
     setSent(true)
