@@ -1,4 +1,5 @@
-import { resolveDealTicket } from "@/server/services/deal-tickets"
+import { buildTicketUrl, resolveDealTicket } from "@/server/services/deal-tickets"
+import { generateTicketQrCodeDataUrl } from "@/server/services/deal-ticket-qr"
 import SiteHeader from "@/components/site-header"
 import DealTicketStateCard from "@/app/deal/[token]/deal-ticket-state-card"
 import DealTicketView from "@/app/deal/[token]/deal-ticket-view"
@@ -21,6 +22,8 @@ export default async function DealTicketPage({ params }: { params: Promise<{ tok
     )
   }
 
+  const qrCodeDataUrl = await generateTicketQrCodeDataUrl(buildTicketUrl(token))
+
   return (
     <div className="min-h-screen bg-cream">
       <div className="print:hidden">
@@ -41,6 +44,7 @@ export default async function DealTicketPage({ params }: { params: Promise<{ tok
           validUntil: ticket.validUntil?.toISOString() ?? null,
           createdAt: ticket.createdAt.toISOString(),
         }}
+        qrCodeDataUrl={qrCodeDataUrl}
       />
     </div>
   )

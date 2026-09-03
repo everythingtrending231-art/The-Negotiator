@@ -4,7 +4,9 @@ import { recordAudit } from "@/server/audit"
 import { issueAccessToken, revokeTicketTokens, buildCaseUrl } from "@/server/services/tokens"
 import { buildFeedbackUrl, issueFeedbackToken } from "@/server/services/feedback"
 import { buildTicketUrl, issueDealTicket } from "@/server/services/deal-tickets"
-import { sendEmail } from "@/server/email/send"
+import { generateTicketQrCodePngBuffer } from "@/server/services/deal-ticket-qr"
+import { renderDealTicketPdf } from "@/server/services/deal-ticket-pdf"
+import { sendEmail, type EmailAttachment } from "@/server/email/send"
 import { getSetting } from "@/server/services/settings"
 import { buildAccountUrl } from "@/server/services/customer-accounts"
 
@@ -94,6 +96,40 @@ async function sendClosureSummaryEmail(caseId: string, dealTicketUrl?: string | 
   const feedbackToken = await issueFeedbackToken(caseId, negotiationCase.assignedNegotiatorId)
   const supportEmail = await getSetting("supportEmail")
 
+  // A PDF copy of the deal ticket rides along as an attachment — the same
+  // branded content the ticket page shows, so the customer has it even
+  // without clicking through. Only built when a ticket actually exists
+  // (customer-acceptance path); regenerated from the DealTicket row rather
+  // than threaded through as a parameter, since the raw token (needed for
+  // the QR code) isn't available here — only the URL is.
+  let attachments: EmailAttachment[] | undefined
+  if (dealTicketUrl) {
+    const dealTicket = await prisma.dealTicket.findUnique({ where: { caseId } })
+    if (dealTicket) {
+      const qrCodePngBuffer = await generateTicketQrCodePngBuffer(dealTicketUrl)
+      const pdfBuffer = await renderDealTicketPdf(
+        {
+          publicRef: negotiationCase.publicRef,
+          businessName: dealTicket.businessName,
+          categoryName: dealTicket.categoryName,
+          finalPriceCents: dealTicket.finalPriceCents,
+          currency: dealTicket.currency,
+          includedGoods: dealTicket.includedGoods,
+          additionalBenefits: dealTicket.additionalBenefits,
+          conditions: dealTicket.conditions,
+          paymentTerms: dealTicket.paymentTerms,
+          deliveryTerms: dealTicket.deliveryTerms,
+          validUntil: dealTicket.validUntil,
+          createdAt: dealTicket.createdAt,
+        },
+        qrCodePngBuffer,
+      )
+      attachments = [
+        { filename: `deal-ticket-${negotiationCase.publicRef}.pdf`, content: pdfBuffer, contentType: "application/pdf" },
+      ]
+    }
+  }
+
   await sendEmail({
     to: negotiationCase.ticket.customerEmail,
     template: "closure-summary",
@@ -116,6 +152,7 @@ async function sendClosureSummaryEmail(caseId: string, dealTicketUrl?: string | 
       // issue a ticket against.
       dealTicketUrl: dealTicketUrl ?? null,
     },
+    attachments,
   })
 }
 

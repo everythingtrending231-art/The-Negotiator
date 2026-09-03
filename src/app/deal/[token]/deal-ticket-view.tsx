@@ -23,7 +23,7 @@ export type DealTicketData = {
 // Customer-facing counterpart to admin/cases/[id]/receipt/page.tsx — same
 // print: Tailwind convention, but branded and with a visible print button
 // since a customer (unlike Support) can't be assumed to know Ctrl+P.
-export default function DealTicketView({ ticket }: { ticket: DealTicketData }) {
+export default function DealTicketView({ ticket, qrCodeDataUrl }: { ticket: DealTicketData; qrCodeDataUrl: string }) {
   return (
     <div className="max-w-xl mx-auto px-4 pb-16 print:py-0 space-y-4">
       <div className="flex items-center justify-between print:hidden">
@@ -102,15 +102,26 @@ export default function DealTicketView({ ticket }: { ticket: DealTicketData }) {
           )}
         </div>
 
-        <p className="text-sm border-t border-border pt-4">
-          Present this ticket and reference <strong>{ticket.publicRef}</strong> to{" "}
-          <strong>{ticket.businessName}</strong> to complete your purchase.
-        </p>
-
-        <p className="text-xs text-ink-muted">
-          Issued directly by The Negotiator. {ticket.businessName} already confirmed these exact terms before this
-          ticket was issued.
-        </p>
+        <div className="flex items-center gap-4 border-t border-border pt-4">
+          <div className="flex-1 space-y-2">
+            <p className="text-sm">
+              Present this ticket and reference <strong>{ticket.publicRef}</strong> to{" "}
+              <strong>{ticket.businessName}</strong> to complete your purchase.
+            </p>
+            <p className="text-xs text-ink-muted">
+              Issued directly by The Negotiator. {ticket.businessName} already confirmed these exact terms before
+              this ticket was issued.
+            </p>
+          </div>
+          <div className="shrink-0 text-center">
+            <img
+              src={qrCodeDataUrl}
+              alt={`QR code linking to this deal ticket, reference ${ticket.publicRef}`}
+              className="w-20 h-20"
+            />
+            <p className="text-[10px] text-ink-muted mt-1">Scan to verify</p>
+          </div>
+        </div>
       </Card>
     </div>
   )
