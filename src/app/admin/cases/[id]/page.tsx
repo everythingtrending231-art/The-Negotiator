@@ -27,6 +27,7 @@ export default async function AdminCaseDetailPage({ params }: { params: Promise<
         feedback: true,
         disputes: { orderBy: { createdAt: "desc" }, include: { notes: { orderBy: { createdAt: "asc" } } } },
         riskFlags: { orderBy: { createdAt: "desc" } },
+        dealTicket: { select: { createdAt: true } },
       },
     }),
     prisma.negotiator.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
@@ -119,6 +120,7 @@ export default async function AdminCaseDetailPage({ params }: { params: Promise<
         clearedByType: f.clearedByType,
         createdAt: f.createdAt.toISOString(),
       }))}
+      dealTicketIssuedAt={negotiationCase.dealTicket?.createdAt.toISOString() ?? null}
     />
   )
 }

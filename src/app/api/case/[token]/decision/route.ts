@@ -20,12 +20,12 @@ export async function POST(request: Request, context: { params: Promise<{ token:
   }
 
   try {
-    const negotiationCase = await recordCustomerDecision(
+    const { negotiationCase, dealTicketUrl } = await recordCustomerDecision(
       ticket.negotiationCaseId,
       offerId,
       decision as CustomerDecision,
     )
-    return NextResponse.json({ case: negotiationCase })
+    return NextResponse.json({ case: negotiationCase, dealTicketUrl })
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 400 })
   }

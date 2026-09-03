@@ -24,6 +24,7 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
       feedback: true,
       disputes: { orderBy: { createdAt: "desc" }, include: { notes: { orderBy: { createdAt: "asc" } } } },
       riskFlags: { orderBy: { createdAt: "desc" } },
+      dealTicket: { select: { createdAt: true } },
     },
   })
 
@@ -130,6 +131,7 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
         clearedByType: f.clearedByType,
         createdAt: f.createdAt.toISOString(),
       }))}
+      dealTicketIssuedAt={negotiationCase.dealTicket?.createdAt.toISOString() ?? null}
       currentNegotiator={{ id: negotiatorId, name: session.name }}
       businesses={businesses.map((b) => ({ id: b.id, name: b.name }))}
       feedback={

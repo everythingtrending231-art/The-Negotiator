@@ -3,6 +3,7 @@ import { prisma } from "@/server/db"
 import { recordAudit } from "@/server/audit"
 import { issueAccessToken, revokeTicketTokens, buildCaseUrl } from "@/server/services/tokens"
 import { buildFeedbackUrl, issueFeedbackToken } from "@/server/services/feedback"
+import { buildTicketUrl, issueDealTicket } from "@/server/services/deal-tickets"
 import { sendEmail } from "@/server/email/send"
 import { getSetting } from "@/server/services/settings"
 import { buildAccountUrl } from "@/server/services/customer-accounts"
@@ -70,7 +71,7 @@ export async function applyStatusChangeInTx(
   return { shouldSendClosureSummary, shouldSendOfferReady }
 }
 
-async function sendClosureSummaryEmail(caseId: string) {
+async function sendClosureSummaryEmail(caseId: string, dealTicketUrl?: string | null) {
   const negotiationCase = await prisma.negotiationCase.findUniqueOrThrow({
     where: { id: caseId },
     include: {
@@ -110,6 +111,10 @@ async function sendClosureSummaryEmail(caseId: string) {
       supportEmail,
       feedbackUrl: buildFeedbackUrl(feedbackToken),
       accountUrl: buildAccountUrl(),
+      // Only set on the customer-acceptance path (recordCustomerDecision) —
+      // a negotiator-manual or admin-force closure has no accepted offer to
+      // issue a ticket against.
+      dealTicketUrl: dealTicketUrl ?? null,
     },
   })
 }
@@ -385,8 +390,11 @@ export async function adminForceCloseCase(caseId: string, adminId: string, reaso
 export type CustomerDecision = "ACCEPTED" | "DECLINED" | "REQUESTED_ANOTHER_ROUND"
 
 export async function recordCustomerDecision(caseId: string, offerId: string, decision: CustomerDecision) {
-  const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
-  const offer = await prisma.offer.findUniqueOrThrow({ where: { id: offerId } })
+  const existing = await prisma.negotiationCase.findUniqueOrThrow({
+    where: { id: caseId },
+    include: { category: true },
+  })
+  const offer = await prisma.offer.findUniqueOrThrow({ where: { id: offerId }, include: { business: true } })
 
   if (offer.caseId !== caseId) {
     throw new Error("This offer does not belong to this case.")
@@ -423,9 +431,35 @@ export async function recordCustomerDecision(caseId: string, offerId: string, de
     return applyStatusChangeInTx(tx, existing, newCaseStatus, { actorType: "CUSTOMER" }, "web")
   })
 
-  if (shouldSendClosureSummary) {
-    await sendClosureSummaryEmail(caseId)
+  // Own transaction (same convention as issueFeedbackToken), issued
+  // whenever the customer actually accepts — independent of
+  // shouldSendClosureSummary, which only guards the closure email's
+  // one-time idempotency and isn't specific to acceptance. Built here (not
+  // deferred into sendClosureSummaryEmail) so the raw URL can flow straight
+  // back into the API response: the case dashboard's AccessToken is
+  // already revoked by this point, so this is the only moment the customer
+  // can be handed the link before their page goes dead.
+  let dealTicketUrl: string | null = null
+  if (decision === "ACCEPTED") {
+    const raw = await issueDealTicket(caseId, {
+      businessName: offer.business.name,
+      categoryName: existing.category.name,
+      finalPriceCents: offer.finalPriceCents,
+      currency: offer.currency,
+      includedGoods: offer.includedGoods,
+      additionalBenefits: offer.additionalBenefits,
+      conditions: offer.conditions,
+      paymentTerms: offer.paymentTerms,
+      deliveryTerms: offer.deliveryTerms,
+      validUntil: offer.validUntil,
+    })
+    dealTicketUrl = buildTicketUrl(raw)
   }
 
-  return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+  if (shouldSendClosureSummary) {
+    await sendClosureSummaryEmail(caseId, dealTicketUrl)
+  }
+
+  const negotiationCase = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+  return { negotiationCase, dealTicketUrl }
 }

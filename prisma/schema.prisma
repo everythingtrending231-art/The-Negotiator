@@ -359,6 +359,7 @@ model NegotiationCase {
   feedback      Feedback?
   disputes      Dispute[]
   riskFlags     RiskFlag[]
+  dealTicket    DealTicket?
 
   @@index([status])
 }
@@ -860,4 +861,38 @@ model Feedback {
   submittedAt      DateTime?
 
   @@index([negotiatorId])
+}
+
+// Issued once, the moment a customer accepts an offer (same request that
+// closes the NegotiationTicket and revokes its AccessTokens) — same
+// pattern as Feedback: a dedicated, independent token that keeps working
+// after the case's regular dashboard access dies, scoped to exactly one
+// purpose. No payment/fee data anywhere here — the platform takes no
+// transaction fee from customers, and every payment mechanic is TBD
+// (docs/21_OPEN_DECISIONS.md); this is purely a branded confirmation the
+// customer takes to the business to complete the purchase/booking
+// themselves. Snapshots the agreed terms at issuance rather than
+// live-referencing the Offer, so the ticket stays a fixed, verifiable
+// record even if the business/category/offer rows are edited later. No
+// expiry (like Feedback) — this is the customer's permanent record of the
+// deal, not a temporary access grant.
+model DealTicket {
+  id     String          @id @default(cuid())
+  caseId String          @unique
+  case   NegotiationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  // sha256 of the raw token — same convention as AccessToken/Feedback.
+  tokenHash String @unique
+  createdAt DateTime @default(now())
+
+  businessName       String
+  categoryName       String
+  finalPriceCents    Int
+  currency           String
+  includedGoods      String
+  additionalBenefits String?
+  conditions         String?
+  paymentTerms       String?
+  deliveryTerms      String?
+  validUntil         DateTime?
 }
