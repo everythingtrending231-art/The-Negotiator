@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next"
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 
 // Only the public, unauthenticated, non-customer-specific entry points.
 // /case/[token] is deliberately excluded — those URLs are per-customer

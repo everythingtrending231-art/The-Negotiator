@@ -26,7 +26,7 @@ const lora = Lora({
   display: "swap",
 })
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 const TITLE = "The Negotiator"
 const DESCRIPTION = "You ask. We negotiate. Tell us what you're trying to buy, book, or get — your Negotiator goes to work on it."
 

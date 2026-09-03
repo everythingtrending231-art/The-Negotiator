@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next"
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 
 // /case/ is the important one here: those are per-customer magic-link
 // URLs, and a search engine indexing one would be a real exposure, not
