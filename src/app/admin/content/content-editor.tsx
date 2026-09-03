@@ -72,8 +72,8 @@ function TextBlockRow({ block }: { block: Block }) {
 
   return (
     <div className="space-y-2">
-      <Label>{block.adminLabel ?? block.key}</Label>
-      <Textarea rows={2} value={value} onChange={(e) => setValue(e.target.value)} />
+      <Label htmlFor={`content-${block.id}`}>{block.adminLabel ?? block.key}</Label>
+      <Textarea id={`content-${block.id}`} rows={2} value={value} onChange={(e) => setValue(e.target.value)} />
       <Button size="sm" disabled={busy || !value.trim()} onClick={save}>
         {busy ? "Saving…" : "Save"}
       </Button>

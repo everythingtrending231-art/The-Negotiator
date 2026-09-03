@@ -66,9 +66,9 @@ export default function EditUserForm({ actorRole, user }: { actorRole: Role; use
 
       <Card className="p-6 space-y-4">
         <div className="space-y-2">
-          <Label>Role</Label>
+          <Label htmlFor="user-role">Role</Label>
           <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-            <SelectTrigger>
+            <SelectTrigger id="user-role">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

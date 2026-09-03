@@ -129,38 +129,38 @@ function AdminOfferEditor({ offer }: { offer: Offer }) {
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label>Final price ($)</Label>
-              <Input inputMode="decimal" value={finalPrice} onChange={(e) => setFinalPrice(e.target.value)} />
+              <Label htmlFor={`offer-${offer.id}-final-price`}>Final price ($)</Label>
+              <Input id={`offer-${offer.id}-final-price`} inputMode="decimal" value={finalPrice} onChange={(e) => setFinalPrice(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Original value ($, optional)</Label>
-              <Input inputMode="decimal" value={originalValue} onChange={(e) => setOriginalValue(e.target.value)} />
+              <Label htmlFor={`offer-${offer.id}-original-value`}>Original value ($, optional)</Label>
+              <Input id={`offer-${offer.id}-original-value`} inputMode="decimal" value={originalValue} onChange={(e) => setOriginalValue(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Valid until</Label>
-              <Input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
+              <Label htmlFor={`offer-${offer.id}-valid-until`}>Valid until</Label>
+              <Input id={`offer-${offer.id}-valid-until`} type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
             </div>
           </div>
           <div className="space-y-1">
-            <Label>Included goods / services</Label>
-            <Textarea rows={2} value={includedGoods} onChange={(e) => setIncludedGoods(e.target.value)} />
+            <Label htmlFor={`offer-${offer.id}-included-goods`}>Included goods / services</Label>
+            <Textarea id={`offer-${offer.id}-included-goods`} rows={2} value={includedGoods} onChange={(e) => setIncludedGoods(e.target.value)} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label>Additional benefits</Label>
-              <Input value={additionalBenefits} onChange={(e) => setAdditionalBenefits(e.target.value)} />
+              <Label htmlFor={`offer-${offer.id}-additional-benefits`}>Additional benefits</Label>
+              <Input id={`offer-${offer.id}-additional-benefits`} value={additionalBenefits} onChange={(e) => setAdditionalBenefits(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Conditions</Label>
-              <Input value={conditions} onChange={(e) => setConditions(e.target.value)} />
+              <Label htmlFor={`offer-${offer.id}-conditions`}>Conditions</Label>
+              <Input id={`offer-${offer.id}-conditions`} value={conditions} onChange={(e) => setConditions(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Payment terms</Label>
-              <Input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} />
+              <Label htmlFor={`offer-${offer.id}-payment-terms`}>Payment terms</Label>
+              <Input id={`offer-${offer.id}-payment-terms`} value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Delivery terms</Label>
-              <Input value={deliveryTerms} onChange={(e) => setDeliveryTerms(e.target.value)} />
+              <Label htmlFor={`offer-${offer.id}-delivery-terms`}>Delivery terms</Label>
+              <Input id={`offer-${offer.id}-delivery-terms`} value={deliveryTerms} onChange={(e) => setDeliveryTerms(e.target.value)} />
             </div>
           </div>
           <Button size="sm" disabled={busy || !finalPrice || !includedGoods.trim()} onClick={() => saveConfirm.setOpen(true)}>

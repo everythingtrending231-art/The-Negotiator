@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { usePathname } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import { MessageCircle, X } from "lucide-react"
@@ -16,6 +16,8 @@ const SPRING = { type: "spring" as const, stiffness: 260, damping: 24 }
 // customer/prospect entry point, not shown there.
 const HIDDEN_PATH_PREFIXES = ["/admin", "/negotiator", "/business", "/login"]
 
+const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+
 export default function SupportWidget() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
@@ -23,6 +25,34 @@ export default function SupportWidget() {
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (open) {
+      panelRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus()
+    }
+  }, [open])
+
+  function handlePanelKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Escape") {
+      e.stopPropagation()
+      handleClose()
+      return
+    }
+    if (e.key !== "Tab" || !panelRef.current) return
+    const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+    if (focusable.length === 0) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
 
   if (HIDDEN_PATH_PREFIXES.some((prefix) => pathname?.startsWith(prefix))) {
     return null
@@ -50,6 +80,7 @@ export default function SupportWidget() {
 
   function handleClose() {
     setOpen(false)
+    triggerRef.current?.focus()
     // Reset only after the close animation would've settled, so a
     // reopened widget within the same visit doesn't flash back to a
     // half-filled form mid-transition.
@@ -62,8 +93,10 @@ export default function SupportWidget() {
   return (
     <>
       <motion.button
+        ref={triggerRef}
         type="button"
         aria-label={open ? "Close support chat" : "Chat with support"}
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         whileHover={{ scale: 1.06 }}
         whileTap={{ scale: 0.94 }}
@@ -76,6 +109,11 @@ export default function SupportWidget() {
       <AnimatePresence>
         {open && (
           <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Support chat"
+            onKeyDown={handlePanelKeyDown}
             initial={{ opacity: 0, y: 16, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.95 }}

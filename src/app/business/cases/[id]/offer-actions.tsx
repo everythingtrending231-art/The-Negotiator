@@ -59,6 +59,7 @@ export default function OfferActions({ caseId, offerId }: { caseId: string; offe
         <div className="space-y-2">
           <Textarea
             rows={3}
+            aria-label="What needs to change before you can confirm this?"
             placeholder="What needs to change before you can confirm this?"
             value={note}
             onChange={(event) => setNote(event.target.value)}

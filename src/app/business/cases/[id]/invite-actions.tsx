@@ -43,6 +43,7 @@ export default function InviteActions({ caseId, inviteId }: { caseId: string; in
         <div className="space-y-2">
           <Textarea
             rows={2}
+            aria-label="Reason for declining (optional)"
             placeholder="Optional — let the Negotiator know why (can't fulfill, not a fit, etc.)"
             value={note}
             onChange={(event) => setNote(event.target.value)}

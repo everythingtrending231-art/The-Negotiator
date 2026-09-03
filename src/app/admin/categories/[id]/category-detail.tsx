@@ -147,10 +147,10 @@ export default function CategoryDetail(props: {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-black text-cobalt-600">{c.name}</h1>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => reorder("up")}>
+          <Button size="sm" variant="outline" aria-label="Move up" disabled={busy} onClick={() => reorder("up")}>
             ↑
           </Button>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => reorder("down")}>
+          <Button size="sm" variant="outline" aria-label="Move down" disabled={busy} onClick={() => reorder("down")}>
             ↓
           </Button>
           <StatusBadge status={c.status} />
@@ -163,16 +163,16 @@ export default function CategoryDetail(props: {
 
       <Card className="p-6 space-y-4">
         <div className="space-y-2">
-          <Label>Name</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
+          <Label htmlFor="category-name">Name</Label>
+          <Input id="category-name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="space-y-2">
-          <Label>Description</Label>
-          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+          <Label htmlFor="category-description">Description</Label>
+          <Textarea id="category-description" value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
         <div className="space-y-2">
-          <Label>Icon</Label>
-          <Input value={icon} onChange={(e) => setIcon(e.target.value)} />
+          <Label htmlFor="category-icon">Icon</Label>
+          <Input id="category-icon" value={icon} onChange={(e) => setIcon(e.target.value)} />
         </div>
         <div className="flex items-center gap-2">
           <Checkbox id="customerVisible" checked={customerVisible} onCheckedChange={(v) => setCustomerVisible(v === true)} />
@@ -184,10 +184,10 @@ export default function CategoryDetail(props: {
       </Card>
 
       <Card className="p-6 space-y-3">
-        <Label>Status</Label>
+        <Label htmlFor="category-status">Status</Label>
         <div className="flex items-center gap-3">
           <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger id="category-status" className="w-48">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -224,13 +224,13 @@ export default function CategoryDetail(props: {
         </div>
         <div className="border-t border-border pt-4 grid grid-cols-3 gap-3 items-end">
           <div className="space-y-1 col-span-1">
-            <Label>Field name</Label>
-            <Input value={fieldName} onChange={(e) => setFieldName(e.target.value)} />
+            <Label htmlFor="new-field-name">Field name</Label>
+            <Input id="new-field-name" value={fieldName} onChange={(e) => setFieldName(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label>Type</Label>
+            <Label htmlFor="new-field-type">Type</Label>
             <Select value={fieldType} onValueChange={setFieldType}>
-              <SelectTrigger>
+              <SelectTrigger id="new-field-type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

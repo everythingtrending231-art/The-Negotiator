@@ -259,13 +259,13 @@ export default function CaseDashboard(props: {
             variants={{ hidden: { opacity: 0, y: 16, scale: 0.98 }, show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } } }}
             className="bg-cobalt-600 rounded-panel shadow-panel p-6 sm:p-8 text-white"
           >
-            <p className="text-xs font-bold uppercase tracking-wide text-amber-400 mb-2">
+            <h2 className="text-xs font-bold uppercase tracking-wide text-amber-400 mb-2">
               {effectiveOffer.customerDecision === "ACCEPTED"
                 ? "Deal confirmed"
                 : effectiveOffer.customerDecision
                   ? "Offer"
                   : "Your offer is ready"}
-            </p>
+            </h2>
             <p className="font-black text-4xl sm:text-5xl mb-4 tracking-tight tabular-nums">
               {formatCents(priceValue, effectiveOffer.currency)}
             </p>

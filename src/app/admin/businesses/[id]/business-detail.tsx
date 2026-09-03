@@ -274,12 +274,12 @@ export default function BusinessDetail(props: {
         <TabsContent value="profile" className="space-y-6">
           <Card className="p-6 space-y-4">
             <div className="space-y-2">
-              <Label>Name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
+              <Label htmlFor="business-name">Name</Label>
+              <Input id="business-name" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+              <Label htmlFor="business-description">Description</Label>
+              <Textarea id="business-description" value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label>Categories</Label>
@@ -319,6 +319,7 @@ export default function BusinessDetail(props: {
                 </p>
                 <Textarea
                   rows={2}
+                  aria-label="Reason for deletion"
                   value={deleteReason}
                   onChange={(e) => setDeleteReason(e.target.value)}
                   placeholder="Reason for deletion (required, for internal audit)"
@@ -341,7 +342,7 @@ export default function BusinessDetail(props: {
             <h2 className="font-bold text-cobalt-600">Verification</h2>
             <div className="flex flex-wrap items-center gap-3">
               <Select value={verificationStatus} onValueChange={setVerificationStatus}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger aria-label="Verification status" className="w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -353,6 +354,7 @@ export default function BusinessDetail(props: {
                 </SelectContent>
               </Select>
               <Input
+                aria-label="Reason code"
                 placeholder="Reason code (optional)"
                 value={reasonCode}
                 onChange={(e) => setReasonCode(e.target.value)}
