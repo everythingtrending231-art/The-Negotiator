@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import { motion } from "framer-motion"
+import * as Sentry from "@sentry/nextjs"
 import NegotiatorMark from "@/components/negotiator-mark"
 
 // Next.js requires error boundaries to be Client Components. Catches any
@@ -12,6 +13,7 @@ import NegotiatorMark from "@/components/negotiator-mark"
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error(error)
+    Sentry.captureException(error)
   }, [error])
 
   return (
