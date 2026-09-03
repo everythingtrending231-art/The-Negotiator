@@ -261,6 +261,7 @@ model Negotiator {
   messages      Message[]
   notes         InternalNote[]
   offers        Offer[]
+  feedback      Feedback[]
 }
 
 // ---------------------------------------------------------------------------
@@ -345,6 +346,7 @@ model NegotiationCase {
   offers        Offer[]
   auditLogs     AuditLog[]
   invites       CaseBusinessInvite[]
+  feedback      Feedback?
 
   @@index([status])
 }
@@ -679,4 +681,41 @@ model RateLimitEvent {
   createdAt DateTime @default(now())
 
   @@index([key, createdAt])
+}
+
+// Post-closure feedback (docs/03_CUSTOMER_JOURNEY.md §12) — one row per
+// case, created the moment the closure-summary email fires (same point a
+// terminal status is first reached) so the emailed link works even though
+// this is *after* the case's AccessToken has already been revoked
+// (docs/03 §10.1: dashboard access is never reinstated post-closure). This
+// is a narrower, one-time, write-only grant — proving you're this case's
+// customer to submit one short survey — not a resurrection of case-detail
+// read access, so it doesn't conflict with that rule.
+// Response fields are nullable because the row exists from the moment the
+// token is issued, before the customer has answered anything;
+// submittedAt null means "not yet submitted," matching AccessToken.usedAt.
+model Feedback {
+  id     String          @id @default(cuid())
+  caseId String          @unique
+  case   NegotiationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  // Denormalized off the case's assignedNegotiatorId at issuance time, so
+  // per-negotiator aggregates never need a join back through the case and
+  // stay correct even if a case gets reassigned after closure.
+  negotiatorId String?
+  negotiator   Negotiator? @relation(fields: [negotiatorId], references: [id])
+
+  // sha256 of the raw token — same "only ever plaintext in the emailed
+  // URL" convention as AccessToken.tokenHash.
+  tokenHash String @unique
+  createdAt DateTime @default(now())
+
+  // The four questions from docs/03 §12, in order.
+  savedMoney       Boolean?
+  improvedDeal     Boolean?
+  negotiatorRating Int? // 1-5, "How was your Negotiator?"
+  wouldUseAgain    Boolean?
+  submittedAt      DateTime?
+
+  @@index([negotiatorId])
 }

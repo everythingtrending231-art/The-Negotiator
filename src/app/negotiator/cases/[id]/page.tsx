@@ -21,6 +21,7 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
       offers: { orderBy: { createdAt: "desc" }, include: { businessContact: true } },
       auditLogs: { orderBy: { createdAt: "desc" }, take: 50 },
       invites: { orderBy: { createdAt: "desc" }, include: { business: true, respondedByContact: true } },
+      feedback: true,
     },
   })
 
@@ -102,6 +103,17 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
       }))}
       currentNegotiator={{ id: negotiatorId, name: session.name }}
       businesses={businesses.map((b) => ({ id: b.id, name: b.name }))}
+      feedback={
+        negotiationCase.feedback
+          ? {
+              submittedAt: negotiationCase.feedback.submittedAt?.toISOString() ?? null,
+              savedMoney: negotiationCase.feedback.savedMoney,
+              improvedDeal: negotiationCase.feedback.improvedDeal,
+              negotiatorRating: negotiationCase.feedback.negotiatorRating,
+              wouldUseAgain: negotiationCase.feedback.wouldUseAgain,
+            }
+          : null
+      }
     />
   )
 }

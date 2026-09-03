@@ -43,6 +43,13 @@ type Offer = {
   businessContactName: string | null
 }
 type AuditLogRow = { id: string; action: string; actorType: string; sourceChannel: string; createdAt: string }
+type Feedback = {
+  submittedAt: string | null
+  savedMoney: boolean | null
+  improvedDeal: boolean | null
+  negotiatorRating: number | null
+  wouldUseAgain: boolean | null
+} | null
 
 export default function AdminCaseDetail(props: {
   negotiationCase: NegotiationCase
@@ -51,6 +58,7 @@ export default function AdminCaseDetail(props: {
   notes: Note[]
   offers: Offer[]
   auditLogs: AuditLogRow[]
+  feedback: Feedback
 }) {
   const router = useRouter()
   const c = props.negotiationCase
@@ -184,6 +192,7 @@ export default function AdminCaseDetail(props: {
         <TabsList>
           <TabsTrigger value="offers">Offers ({props.offers.length})</TabsTrigger>
           <TabsTrigger value="conversation">Messages &amp; notes</TabsTrigger>
+          <TabsTrigger value="feedback">Feedback</TabsTrigger>
           <TabsTrigger value="audit">Audit</TabsTrigger>
         </TabsList>
 
@@ -259,6 +268,36 @@ export default function AdminCaseDetail(props: {
                 )
               })}
             </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="feedback">
+          <Card className="p-6 space-y-3">
+            <h2 className="font-bold text-cobalt-600">Customer feedback</h2>
+            {!props.feedback?.submittedAt ? (
+              <p className="text-sm text-ink-muted">
+                {props.feedback ? "Sent, not yet answered." : "Not sent yet — this case hasn't closed."}
+              </p>
+            ) : (
+              <dl className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <dt className="text-xs font-bold uppercase tracking-wide text-ink-muted">Saved money?</dt>
+                  <dd>{props.feedback.savedMoney ? "Yes" : "No"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-bold uppercase tracking-wide text-ink-muted">Improved the deal?</dt>
+                  <dd>{props.feedback.improvedDeal ? "Yes" : "No"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-bold uppercase tracking-wide text-ink-muted">Negotiator rating</dt>
+                  <dd>{props.feedback.negotiatorRating} / 5</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-bold uppercase tracking-wide text-ink-muted">Would use again?</dt>
+                  <dd>{props.feedback.wouldUseAgain ? "Yes" : "No"}</dd>
+                </div>
+              </dl>
+            )}
           </Card>
         </TabsContent>
 

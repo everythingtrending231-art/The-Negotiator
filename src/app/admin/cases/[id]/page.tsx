@@ -24,6 +24,7 @@ export default async function AdminCaseDetailPage({ params }: { params: Promise<
         internalNotes: { orderBy: { createdAt: "asc" }, include: { negotiator: true } },
         offers: { orderBy: { createdAt: "desc" }, include: { businessContact: true } },
         auditLogs: { orderBy: { createdAt: "desc" }, take: 100 },
+        feedback: true,
       },
     }),
     prisma.negotiator.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
@@ -78,6 +79,17 @@ export default async function AdminCaseDetailPage({ params }: { params: Promise<
         sourceChannel: a.sourceChannel,
         createdAt: a.createdAt.toISOString(),
       }))}
+      feedback={
+        negotiationCase.feedback
+          ? {
+              submittedAt: negotiationCase.feedback.submittedAt?.toISOString() ?? null,
+              savedMoney: negotiationCase.feedback.savedMoney,
+              improvedDeal: negotiationCase.feedback.improvedDeal,
+              negotiatorRating: negotiationCase.feedback.negotiatorRating,
+              wouldUseAgain: negotiationCase.feedback.wouldUseAgain,
+            }
+          : null
+      }
     />
   )
 }

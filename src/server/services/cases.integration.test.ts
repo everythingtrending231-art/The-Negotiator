@@ -109,6 +109,24 @@ describe("setCaseStatus", () => {
     expect(closureEmails).toHaveLength(1)
   })
 
+  it("issues a feedback token and includes its URL in the closure summary when reaching a terminal status", async () => {
+    const negotiator = await createNegotiator()
+    const negotiationCase = await createCase({ status: "NEGOTIATING", assignedNegotiatorId: negotiator.id })
+    await createTicket({ negotiationCaseId: negotiationCase.id, customerEmail: "feedback-wiring@example.com" })
+
+    await setCaseStatus(negotiationCase.id, "CLOSED", negotiator.id)
+
+    const feedback = await testPrisma.feedback.findUniqueOrThrow({ where: { caseId: negotiationCase.id } })
+    expect(feedback.negotiatorId).toBe(negotiator.id)
+    expect(feedback.submittedAt).toBeNull()
+
+    const email = await testPrisma.emailLog.findFirstOrThrow({
+      where: { template: "closure-summary", to: "feedback-wiring@example.com" },
+    })
+    const data = email.dataJson as { feedbackUrl?: string }
+    expect(data.feedbackUrl).toContain("/feedback/")
+  })
+
   it("sends the offer-ready email exactly once when a case newly reaches OFFER_READY", async () => {
     const negotiationCase = await createCase({ status: "AWAITING_BUSINESS" })
     await createTicket({ negotiationCaseId: negotiationCase.id, customerEmail: "offer-ready@example.com" })

@@ -2,6 +2,7 @@ import type { ActorType, CaseStatus, Prisma } from "@prisma/client"
 import { prisma } from "@/server/db"
 import { recordAudit } from "@/server/audit"
 import { issueAccessToken, revokeTicketTokens, buildCaseUrl } from "@/server/services/tokens"
+import { buildFeedbackUrl, issueFeedbackToken } from "@/server/services/feedback"
 import { sendEmail } from "@/server/email/send"
 
 // PRD §7 names these five as terminal (they trigger dashboard-access
@@ -82,6 +83,13 @@ async function sendClosureSummaryEmail(caseId: string) {
   // never appear in the customer's closure summary either.
   const latestOffer = negotiationCase.offers.find((offer) => offer.status !== "PROPOSED")
 
+  // Issued here, not earlier — this is the one point every terminal-status
+  // path already funnels through exactly once (guarded by
+  // ticket.closureSummarySentAt in applyStatusChangeInTx), so the feedback
+  // ask can piggyback on the closure email instead of needing its own
+  // separate trigger/send (docs/03 §12).
+  const feedbackToken = await issueFeedbackToken(caseId, negotiationCase.assignedNegotiatorId)
+
   await sendEmail({
     to: negotiationCase.ticket.customerEmail,
     template: "closure-summary",
@@ -97,6 +105,7 @@ async function sendClosureSummaryEmail(caseId: string) {
           }
         : null,
       supportEmail: process.env.SUPPORT_EMAIL ?? "support@example.com",
+      feedbackUrl: buildFeedbackUrl(feedbackToken),
     },
   })
 }
