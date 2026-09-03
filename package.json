@@ -12,6 +12,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration:setup": "DATABASE_URL=\"${DATABASE_URL_TEST:-postgresql://postgres:postgres@localhost:5432/negotiator_test}\" DIRECT_URL=\"${DATABASE_URL_TEST:-postgresql://postgres:postgres@localhost:5432/negotiator_test}\" prisma migrate deploy",
+    "test:all": "pnpm test && pnpm test:integration",
     "postinstall": "prisma generate",
     "prisma:seed": "tsx prisma/seed.ts"
   },
