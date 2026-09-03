@@ -625,9 +625,9 @@ function OfferForm(props: {
     <div className="border border-border rounded-lg p-4 space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label>Business</Label>
+          <Label htmlFor="new-offer-business">Business</Label>
           <Select value={businessId} onValueChange={setBusinessId}>
-            <SelectTrigger>
+            <SelectTrigger id="new-offer-business">
               <SelectValue placeholder="Choose a business" />
             </SelectTrigger>
             <SelectContent>
@@ -640,16 +640,16 @@ function OfferForm(props: {
           </Select>
         </div>
         <div className="space-y-1">
-          <Label>Final price ($)</Label>
-          <Input inputMode="decimal" value={finalPrice} onChange={(e) => setFinalPrice(e.target.value)} />
+          <Label htmlFor="new-offer-final-price">Final price ($)</Label>
+          <Input id="new-offer-final-price" inputMode="decimal" value={finalPrice} onChange={(e) => setFinalPrice(e.target.value)} />
         </div>
         <div className="space-y-1">
-          <Label>Original value ($, optional)</Label>
-          <Input inputMode="decimal" value={originalValue} onChange={(e) => setOriginalValue(e.target.value)} />
+          <Label htmlFor="new-offer-original-value">Original value ($, optional)</Label>
+          <Input id="new-offer-original-value" inputMode="decimal" value={originalValue} onChange={(e) => setOriginalValue(e.target.value)} />
         </div>
         <div className="space-y-1">
-          <Label>Valid until</Label>
-          <Input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
+          <Label htmlFor="new-offer-valid-until">Valid until</Label>
+          <Input id="new-offer-valid-until" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
         </div>
       </div>
 

@@ -48,9 +48,9 @@ export default function AuditFilters({
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
       <div className="space-y-1">
-        <Label>Actor type</Label>
+        <Label htmlFor="audit-actor-type">Actor type</Label>
         <Select value={actorType} onValueChange={setActorType}>
-          <SelectTrigger>
+          <SelectTrigger id="audit-actor-type">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -64,9 +64,9 @@ export default function AuditFilters({
         </Select>
       </div>
       <div className="space-y-1">
-        <Label>Source channel</Label>
+        <Label htmlFor="audit-source-channel">Source channel</Label>
         <Select value={sourceChannel} onValueChange={setSourceChannel}>
-          <SelectTrigger>
+          <SelectTrigger id="audit-source-channel">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -80,20 +80,20 @@ export default function AuditFilters({
         </Select>
       </div>
       <div className="space-y-1">
-        <Label>Action</Label>
-        <Input value={action} onChange={(e) => setAction(e.target.value)} placeholder="e.g. CASE_ESCALATED" />
+        <Label htmlFor="audit-action">Action</Label>
+        <Input id="audit-action" value={action} onChange={(e) => setAction(e.target.value)} placeholder="e.g. CASE_ESCALATED" />
       </div>
       <div className="space-y-1">
-        <Label>From</Label>
-        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        <Label htmlFor="audit-from">From</Label>
+        <Input id="audit-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
       </div>
       <div className="space-y-1">
-        <Label>To</Label>
-        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        <Label htmlFor="audit-to">To</Label>
+        <Input id="audit-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
       <div className="space-y-1">
-        <Label>Search entity type/id</Label>
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Offer, or an entity id" />
+        <Label htmlFor="audit-search">Search entity type/id</Label>
+        <Input id="audit-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Offer, or an entity id" />
       </div>
       <Button size="sm" onClick={apply} className="col-span-2 sm:col-span-1">
         Apply filters
