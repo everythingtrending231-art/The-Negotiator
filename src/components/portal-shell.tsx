@@ -32,9 +32,19 @@ export default function PortalShell({
   return (
     <div className="min-h-screen bg-cream">
       <header className="bg-white border-b border-cobalt-100">
-        <div className={cn("mx-auto px-4 py-4 flex items-center justify-between gap-4", maxWidthClassName)}>
-          <nav className="flex items-center gap-5 text-sm font-bold overflow-x-auto">
-            <span className="text-cobalt-600 whitespace-nowrap">{title}</span>
+        <div className={cn("mx-auto px-4 pt-4", maxWidthClassName)}>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-cobalt-600 font-bold text-sm whitespace-nowrap">{title}</span>
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="text-xs text-ink-muted hidden sm:inline">{sessionLabel}</span>
+              <LogoutButton />
+            </div>
+          </div>
+          {/* Wraps onto as many lines as needed instead of scrolling — a
+              portal's nav can grow past a single row's width (e.g. Admin's
+              13 items), and a horizontal scrollbar hides items rather than
+              just wrapping them below the fold. */}
+          <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-bold py-3">
             {nav.map((item) => {
               const active = pathname === item.href || pathname?.startsWith(`${item.href}/`)
               return (
@@ -51,10 +61,6 @@ export default function PortalShell({
               )
             })}
           </nav>
-          <div className="flex items-center gap-3 shrink-0">
-            <span className="text-xs text-ink-muted hidden sm:inline">{sessionLabel}</span>
-            <LogoutButton />
-          </div>
         </div>
       </header>
       <div>{children}</div>
