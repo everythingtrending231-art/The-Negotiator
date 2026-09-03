@@ -8,6 +8,7 @@ import {
   inviteAcceptedEmail,
   inviteDeclinedEmail,
   offerChangesRequestedEmail,
+  supportInquiryEmail,
   type TicketConfirmationData,
   type MagicLinkResendData,
   type ClosureSummaryData,
@@ -16,6 +17,7 @@ import {
   type InviteAcceptedData,
   type InviteDeclinedData,
   type OfferChangesRequestedData,
+  type SupportInquiryData,
 } from "@/server/email/templates"
 
 type TemplateMap = {
@@ -27,6 +29,7 @@ type TemplateMap = {
   "invite-accepted": InviteAcceptedData
   "invite-declined": InviteDeclinedData
   "offer-changes-requested": OfferChangesRequestedData
+  "support-inquiry": SupportInquiryData
 }
 
 export type EmailTemplate = keyof TemplateMap
@@ -49,6 +52,8 @@ function render<T extends EmailTemplate>(template: T, data: TemplateMap[T]) {
       return inviteDeclinedEmail(data as InviteDeclinedData)
     case "offer-changes-requested":
       return offerChangesRequestedEmail(data as OfferChangesRequestedData)
+    case "support-inquiry":
+      return supportInquiryEmail(data as SupportInquiryData)
     default: {
       const exhaustive: never = template
       throw new Error(`Unknown email template: ${exhaustive}`)

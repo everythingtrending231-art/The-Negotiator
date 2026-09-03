@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { Archivo, Lora } from "next/font/google"
 import { MotionConfig } from "framer-motion"
 import { Toaster } from "@/components/ui/sonner"
+import SupportWidget from "@/components/support-widget"
 import "./globals.css"
 
 // Brand direction calls for Liberation Sans — not distributed as a webfont
@@ -49,6 +50,7 @@ export default function RootLayout({
         <MotionConfig reducedMotion="user">
           {children}
           <Toaster position="top-right" richColors closeButton />
+          <SupportWidget />
         </MotionConfig>
       </body>
     </html>

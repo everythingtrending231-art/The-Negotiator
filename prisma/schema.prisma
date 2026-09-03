@@ -650,3 +650,18 @@ model ContentBlock {
   @@unique([page, key])
   @@index([page])
 }
+
+// A proactive support entry point (the bottom-left messenger widget) —
+// distinct from the reactive, post-closure support flow, which is never
+// self-service (see docs/03 §10.1). No FKs into the negotiation domain: an
+// inquiry may not relate to any case at all. Purely async — no
+// status/resolution workflow or admin inbox in this pass; staff reply by
+// email. The row exists mainly so an inquiry isn't lost if the
+// notification email fails to send.
+model SupportInquiry {
+  id         String   @id @default(cuid())
+  email      String
+  message    String
+  sourcePage String
+  createdAt  DateTime @default(now())
+}

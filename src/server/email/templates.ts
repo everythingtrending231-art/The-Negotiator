@@ -158,6 +158,27 @@ export function offerChangesRequestedEmail(data: OfferChangesRequestedData) {
   }
 }
 
+export type SupportInquiryData = {
+  email: string
+  message: string
+  sourcePage: string
+}
+
+// Sent to Support, not the customer — staff reply from their own inbox,
+// no new reply channel. The on-page widget confirmation is the customer's
+// only receipt.
+export function supportInquiryEmail(data: SupportInquiryData) {
+  return {
+    subject: `New support message from ${data.email}`,
+    html: `
+      <p>New message via the site support widget.</p>
+      <p>From: <strong>${escapeHtml(data.email)}</strong></p>
+      <p>Page: ${escapeHtml(data.sourcePage)}</p>
+      <p>Message: &ldquo;${escapeHtml(data.message)}&rdquo;</p>
+    `,
+  }
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
