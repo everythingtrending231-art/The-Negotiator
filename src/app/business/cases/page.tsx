@@ -1,26 +1,50 @@
 import Link from "next/link"
 import { prisma } from "@/server/db"
+import type { Prisma } from "@prisma/client"
 import { requireRole, getActingBusinessContact } from "@/server/auth/require-session"
 import { formatCents } from "@/lib/money"
 import { Card } from "@/components/ui/card"
 import StatusBadge from "@/components/status-badge"
 import { cn } from "@/lib/utils"
+import CaseSearchInput from "@/components/case-search-input"
 
 const TERMINAL_STATUSES = ["ACCEPTED", "DECLINED", "EXPIRED", "CANCELLED", "COMPLETED", "DISPUTED", "CLOSED"]
 
-export default async function BusinessCasesPage() {
+export default async function BusinessCasesPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const session = await requireRole(["BUSINESS"])
   const contact = await getActingBusinessContact(session)
+  const { q } = await searchParams
+
+  // No customer-email search here — a business never sees the customer's
+  // email (same visibility boundary as the case-detail page), so search is
+  // limited to what's already shown: the case number and its category.
+  const query = q?.trim()
+  const caseTextFilter: Prisma.NegotiationCaseWhereInput[] = query
+    ? [
+        { publicRef: { contains: query, mode: "insensitive" } },
+        { category: { name: { contains: query, mode: "insensitive" } } },
+      ]
+    : []
 
   const [cases, invites] = await Promise.all([
     prisma.negotiationCase.findMany({
-      where: { businessId: contact.businessId },
+      where: { businessId: contact.businessId, ...(query ? { OR: caseTextFilter } : {}) },
       orderBy: { updatedAt: "desc" },
       include: { category: true, offers: { orderBy: { createdAt: "desc" }, take: 1 } },
       take: 100,
     }),
     prisma.caseBusinessInvite.findMany({
-      where: { businessId: contact.businessId },
+      where: {
+        businessId: contact.businessId,
+        ...(query
+          ? {
+              OR: [
+                { case: { publicRef: { contains: query, mode: "insensitive" } } },
+                { case: { category: { name: { contains: query, mode: "insensitive" } } } },
+              ],
+            }
+          : {}),
+      },
       orderBy: { createdAt: "desc" },
       include: { case: { include: { category: true } } },
       take: 100,
@@ -35,7 +59,10 @@ export default async function BusinessCasesPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-8">
-      <h1 className="text-2xl font-black text-cobalt-600">Cases</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-black text-cobalt-600">Cases</h1>
+        <CaseSearchInput placeholder="Search by case number or category…" />
+      </div>
 
       <InviteGroup title="New requests" invites={newRequests} highlight />
       <CaseGroup title="Awaiting your confirmation" cases={awaitingConfirmation} highlight />

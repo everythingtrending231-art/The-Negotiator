@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import StatusBadge from "@/components/status-badge"
 import CaseStatusFilter from "@/app/admin/cases/status-filter"
+import CaseSearchInput from "@/components/case-search-input"
 import type { CaseStatus, Prisma } from "@prisma/client"
 
 // Admin had no per-case visibility before this PR — only aggregate
@@ -13,13 +14,21 @@ import type { CaseStatus, Prisma } from "@prisma/client"
 export default async function AdminCasesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; escalated?: string }>
+  searchParams: Promise<{ status?: string; escalated?: string; q?: string }>
 }) {
-  const { status, escalated } = await searchParams
+  const { status, escalated, q } = await searchParams
 
   const where: Prisma.NegotiationCaseWhereInput = {}
   if (status) where.status = status as CaseStatus
   if (escalated === "1") where.escalated = true
+  if (q?.trim()) {
+    const query = q.trim()
+    where.OR = [
+      { publicRef: { contains: query, mode: "insensitive" } },
+      { description: { contains: query, mode: "insensitive" } },
+      { ticket: { customerEmail: { contains: query, mode: "insensitive" } } },
+    ]
+  }
 
   const cases = await prisma.negotiationCase.findMany({
     where,
@@ -33,8 +42,18 @@ export default async function AdminCasesPage({
       <h1 className="text-2xl font-black text-cobalt-600">Cases</h1>
 
       <div className="flex flex-wrap items-center gap-3">
+        <CaseSearchInput placeholder="Search by case number, email, or description…" />
         <CaseStatusFilter current={status} />
-        <Link href={{ pathname: "/admin/cases", query: { ...(status ? { status } : {}), escalated: escalated === "1" ? undefined : "1" } }}>
+        <Link
+          href={{
+            pathname: "/admin/cases",
+            query: {
+              ...(status ? { status } : {}),
+              ...(q?.trim() ? { q: q.trim() } : {}),
+              escalated: escalated === "1" ? undefined : "1",
+            },
+          }}
+        >
           <Badge variant={escalated === "1" ? "danger" : "outline"}>Escalated only</Badge>
         </Link>
       </div>
