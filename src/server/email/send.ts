@@ -66,6 +66,12 @@ function render<T extends EmailTemplate>(template: T, data: TemplateMap[T]) {
   }
 }
 
+export type EmailAttachment = {
+  filename: string
+  content: Buffer
+  contentType?: string
+}
+
 // Send-or-log: always records an EmailLog row so the flow is auditable and
 // testable without a live inbox (see /internal/dev/outbox). Never throws
 // back to the caller — a broken/missing email provider must not break the
@@ -74,6 +80,7 @@ export async function sendEmail<T extends EmailTemplate>(input: {
   to: string
   template: T
   data: TemplateMap[T]
+  attachments?: EmailAttachment[]
 }): Promise<{ delivered: boolean }> {
   const { subject, html } = render(input.template, input.data)
   const apiKey = process.env.RESEND_API_KEY
@@ -85,7 +92,17 @@ export async function sendEmail<T extends EmailTemplate>(input: {
       const { Resend } = await import("resend")
       const resend = new Resend(apiKey)
       const from = process.env.RESEND_FROM_EMAIL ?? "The Negotiator <onboarding@resend.dev>"
-      const { error } = await resend.emails.send({ from, to: input.to, subject, html })
+      const { error } = await resend.emails.send({
+        from,
+        to: input.to,
+        subject,
+        html,
+        attachments: input.attachments?.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+          content_type: a.contentType,
+        })),
+      })
       providerStatus = error ? "send_failed" : "sent"
       if (error) {
         console.error(`[email] Resend send failed for ${input.template} -> ${input.to}:`, error)
@@ -95,7 +112,10 @@ export async function sendEmail<T extends EmailTemplate>(input: {
       console.error(`[email] Resend send threw for ${input.template} -> ${input.to}:`, error)
     }
   } else {
-    console.log(`[email:${providerStatus}] ${input.template} -> ${input.to}\nSubject: ${subject}\n${html}`)
+    const attachmentNote = input.attachments?.length
+      ? ` (with ${input.attachments.length} attachment${input.attachments.length === 1 ? "" : "s"}: ${input.attachments.map((a) => a.filename).join(", ")})`
+      : ""
+    console.log(`[email:${providerStatus}] ${input.template} -> ${input.to}${attachmentNote}\nSubject: ${subject}\n${html}`)
   }
 
   await prisma.emailLog.create({
