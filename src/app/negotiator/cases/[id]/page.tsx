@@ -23,6 +23,7 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
       invites: { orderBy: { createdAt: "desc" }, include: { business: true, respondedByContact: true } },
       feedback: true,
       disputes: { orderBy: { createdAt: "desc" }, include: { notes: { orderBy: { createdAt: "asc" } } } },
+      riskFlags: { orderBy: { createdAt: "desc" } },
     },
   })
 
@@ -118,6 +119,16 @@ export default async function NegotiatorCaseDetailPage({ params }: { params: Pro
           body: n.body,
           createdAt: n.createdAt.toISOString(),
         })),
+      }))}
+      riskFlags={negotiationCase.riskFlags.map((f) => ({
+        id: f.id,
+        status: f.status,
+        reason: f.reason,
+        raisedByType: f.raisedByType,
+        clearedNote: f.clearedNote,
+        clearedAt: f.clearedAt?.toISOString() ?? null,
+        clearedByType: f.clearedByType,
+        createdAt: f.createdAt.toISOString(),
       }))}
       currentNegotiator={{ id: negotiatorId, name: session.name }}
       businesses={businesses.map((b) => ({ id: b.id, name: b.name }))}

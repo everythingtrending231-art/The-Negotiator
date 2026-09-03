@@ -74,7 +74,18 @@ type Invite = {
   respondedAt: string | null
 }
 
-type ActionKey = "assign" | "status" | "invite" | "note" | "message" | "escalate" | "openDispute" | "disputeNote" | "disputeResolve"
+type ActionKey =
+  | "assign"
+  | "status"
+  | "invite"
+  | "note"
+  | "message"
+  | "escalate"
+  | "openDispute"
+  | "disputeNote"
+  | "disputeResolve"
+  | "raiseRiskFlag"
+  | "clearRiskFlag"
 type DisputeNote = { id: string; authorType: string; body: string; createdAt: string }
 type Dispute = {
   id: string
@@ -86,6 +97,16 @@ type Dispute = {
   resolvedByType: string | null
   createdAt: string
   notes: DisputeNote[]
+}
+type RiskFlag = {
+  id: string
+  status: "OPEN" | "CLEARED"
+  reason: string
+  raisedByType: string
+  clearedNote: string | null
+  clearedAt: string | null
+  clearedByType: string | null
+  createdAt: string
 }
 type Feedback = {
   submittedAt: string | null
@@ -106,6 +127,7 @@ export default function CaseDetail(props: {
   businesses: Business[]
   feedback: Feedback
   disputes: Dispute[]
+  riskFlags: RiskFlag[]
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState<Partial<Record<ActionKey, boolean>>>({})
@@ -121,6 +143,9 @@ export default function CaseDetail(props: {
   const [disputeReason, setDisputeReason] = useState("")
   const [disputeNoteBody, setDisputeNoteBody] = useState<Record<string, string>>({})
   const [disputeResolution, setDisputeResolution] = useState<Record<string, string>>({})
+  const [showRiskFlagForm, setShowRiskFlagForm] = useState(false)
+  const [riskFlagReason, setRiskFlagReason] = useState("")
+  const [riskFlagClearNote, setRiskFlagClearNote] = useState<Record<string, string>>({})
 
   async function runAction(key: ActionKey, fn: () => Promise<Response>, successMessage: string) {
     setBusy((b) => ({ ...b, [key]: true }))
@@ -278,6 +303,40 @@ export default function CaseDetail(props: {
     if (ok) setDisputeResolution((prev) => ({ ...prev, [disputeId]: "" }))
   }
 
+  async function raiseRiskFlagAction() {
+    if (!riskFlagReason.trim()) return
+    const ok = await runAction(
+      "raiseRiskFlag",
+      () =>
+        fetch(`/api/negotiator/cases/${props.negotiationCase.id}/risk-flag`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: riskFlagReason }),
+        }),
+      "Risk flag raised."
+    )
+    if (ok) {
+      setRiskFlagReason("")
+      setShowRiskFlagForm(false)
+    }
+  }
+
+  async function clearRiskFlagAction(flagId: string) {
+    const note = riskFlagClearNote[flagId]?.trim()
+    if (!note) return
+    const ok = await runAction(
+      "clearRiskFlag",
+      () =>
+        fetch(`/api/negotiator/cases/${props.negotiationCase.id}/risk-flag/${flagId}/clear`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ note }),
+        }),
+      "Risk flag cleared."
+    )
+    if (ok) setRiskFlagClearNote((prev) => ({ ...prev, [flagId]: "" }))
+  }
+
   async function sendMessage() {
     if (!message.trim()) return
     const ok = await runAction(
@@ -308,6 +367,7 @@ export default function CaseDetail(props: {
           <h1 className="text-2xl font-black text-cobalt-600">{c.categoryName}</h1>
         </div>
         <div className="flex items-center gap-2">
+          {props.riskFlags.some((f) => f.status === "OPEN") && <Badge variant="danger">Risk flagged</Badge>}
           {c.escalated && <StatusBadge status="DISPUTED" label="Escalated" />}
           <StatusBadge status={c.status} />
         </div>
@@ -430,6 +490,9 @@ export default function CaseDetail(props: {
           <TabsTrigger value="conversation">Messages &amp; notes</TabsTrigger>
           <TabsTrigger value="disputes">
             Disputes{props.disputes.some((d) => d.status === "OPEN") ? " ⚠" : ""}
+          </TabsTrigger>
+          <TabsTrigger value="risk-flags">
+            Risk flags{props.riskFlags.some((f) => f.status === "OPEN") ? " ⚠" : ""}
           </TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
           <TabsTrigger value="audit">Audit</TabsTrigger>
@@ -743,6 +806,84 @@ export default function CaseDetail(props: {
               ) : (
                 <Button size="sm" variant="outline" onClick={() => setShowDisputeForm(true)}>
                   Open a dispute
+                </Button>
+              )}
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="risk-flags" className="space-y-4">
+          {props.riskFlags.length === 0 && (
+            <Card className="p-6">
+              <p className="text-sm text-ink-muted">No risk flags on this case.</p>
+            </Card>
+          )}
+
+          {props.riskFlags.map((flag) => (
+            <Card key={flag.id} className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <Badge variant={flag.status === "OPEN" ? "danger" : "outline"}>{flag.status}</Badge>
+                <p className="text-xs text-ink-muted">
+                  Raised by {flag.raisedByType} · {new Date(flag.createdAt).toLocaleString()}
+                </p>
+              </div>
+              <p className="text-sm">{flag.reason}</p>
+
+              {flag.status === "CLEARED" ? (
+                <div className="border-t border-border pt-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-ink-muted">
+                    Cleared by {flag.clearedByType} ·{" "}
+                    {flag.clearedAt && new Date(flag.clearedAt).toLocaleString()}
+                  </p>
+                  <p className="text-sm">{flag.clearedNote}</p>
+                </div>
+              ) : (
+                <div className="space-y-3 border-t border-border pt-3">
+                  <Textarea
+                    rows={2}
+                    placeholder="Why is this being cleared?"
+                    value={riskFlagClearNote[flag.id] ?? ""}
+                    onChange={(e) => setRiskFlagClearNote((prev) => ({ ...prev, [flag.id]: e.target.value }))}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={busy.clearRiskFlag || !riskFlagClearNote[flag.id]?.trim()}
+                    onClick={() => clearRiskFlagAction(flag.id)}
+                  >
+                    {busy.clearRiskFlag ? "Clearing…" : "Clear flag"}
+                  </Button>
+                </div>
+              )}
+            </Card>
+          ))}
+
+          {!props.riskFlags.some((f) => f.status === "OPEN") && (
+            <Card className="p-6 space-y-3">
+              {showRiskFlagForm ? (
+                <>
+                  <Textarea
+                    rows={3}
+                    placeholder="What's the concern?"
+                    value={riskFlagReason}
+                    onChange={(e) => setRiskFlagReason(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={busy.raiseRiskFlag || !riskFlagReason.trim()}
+                      onClick={raiseRiskFlagAction}
+                    >
+                      {busy.raiseRiskFlag ? "Raising…" : "Confirm risk flag"}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setShowRiskFlagForm(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <Button size="sm" variant="outline" onClick={() => setShowRiskFlagForm(true)}>
+                  Raise a risk flag
                 </Button>
               )}
             </Card>
