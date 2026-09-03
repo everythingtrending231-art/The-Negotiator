@@ -358,6 +358,7 @@ model NegotiationCase {
   invites       CaseBusinessInvite[]
   feedback      Feedback?
   disputes      Dispute[]
+  riskFlags     RiskFlag[]
 
   @@index([status])
 }
@@ -571,6 +572,48 @@ model DisputeNote {
   createdAt DateTime @default(now())
 
   @@index([disputeId])
+}
+
+// docs/02_PRODUCT_REQUIREMENTS.md §6 lists "Fraud/risk flags" as an Admin
+// feature; docs/13_TRUST_RISK_COMPLIANCE.md §2 names payment/identity fraud
+// as core risks but specifies no automated detection or numeric thresholds
+// (docs/21: "High-value transaction threshold," "Approval thresholds" are
+// both TBD). So this is the same shape as NegotiationCase.escalated and
+// Dispute: a plain, staff-raised flag with a reason, never system-derived.
+// A flag attaches to exactly one subject — a case (raised by a Negotiator
+// or Admin while working it) or a customer email (Admin-only, from the
+// customer lookup screen built for fraud/support investigation) — never
+// both; the service layer enforces that, not the schema. Staff-only,
+// never exposed to the Business or Customer views (CLAUDE.md non-negotiable
+// #3).
+enum RiskFlagStatus {
+  OPEN
+  CLEARED
+}
+
+model RiskFlag {
+  id String @id @default(cuid())
+
+  caseId        String?
+  case          NegotiationCase? @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  customerEmail String?
+
+  status RiskFlagStatus @default(OPEN)
+  reason String
+
+  raisedByType ActorType
+  raisedById   String?
+
+  clearedNote   String?
+  clearedAt     DateTime?
+  clearedByType ActorType?
+  clearedById   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([caseId])
+  @@index([customerEmail])
+  @@index([status])
 }
 
 enum OfferStatus {

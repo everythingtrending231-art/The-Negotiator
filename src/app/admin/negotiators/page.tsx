@@ -49,7 +49,7 @@ export default async function AdminNegotiatorsPage() {
                     </Link>
                   </TableCell>
                   <TableCell className="p-0 text-right">
-                    <Link href={`/admin/cases?negotiatorId=${w.id}`} className="block px-4 py-3 text-sm text-ink-muted">
+                    <Link href={`/admin/reviews?negotiatorId=${w.id}`} className="block px-4 py-3 text-sm text-ink-muted">
                       {w.avgRating != null ? `${w.avgRating.toFixed(1)} / 5` : "—"}
                     </Link>
                   </TableCell>

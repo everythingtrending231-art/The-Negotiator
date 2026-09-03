@@ -26,6 +26,7 @@ export default async function AdminCaseDetailPage({ params }: { params: Promise<
         auditLogs: { orderBy: { createdAt: "desc" }, take: 100 },
         feedback: true,
         disputes: { orderBy: { createdAt: "desc" }, include: { notes: { orderBy: { createdAt: "asc" } } } },
+        riskFlags: { orderBy: { createdAt: "desc" } },
       },
     }),
     prisma.negotiator.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
@@ -107,6 +108,16 @@ export default async function AdminCaseDetailPage({ params }: { params: Promise<
           body: n.body,
           createdAt: n.createdAt.toISOString(),
         })),
+      }))}
+      riskFlags={negotiationCase.riskFlags.map((f) => ({
+        id: f.id,
+        status: f.status,
+        reason: f.reason,
+        raisedByType: f.raisedByType,
+        clearedNote: f.clearedNote,
+        clearedAt: f.clearedAt?.toISOString() ?? null,
+        clearedByType: f.clearedByType,
+        createdAt: f.createdAt.toISOString(),
       }))}
     />
   )

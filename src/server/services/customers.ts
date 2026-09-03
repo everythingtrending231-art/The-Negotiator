@@ -9,6 +9,16 @@ export type CustomerSearchResult = {
     createdAt: Date
     negotiationCase: { id: string; publicRef: string; status: string; category: { name: string } }
   }[]
+  riskFlags: {
+    id: string
+    status: "OPEN" | "CLEARED"
+    reason: string
+    raisedByType: string
+    clearedNote: string | null
+    clearedAt: Date | null
+    clearedByType: string | null
+    createdAt: Date
+  }[]
 }
 
 // Support/fraud lookup by email (docs/09's Admin "Customers" area) — not
@@ -34,7 +44,7 @@ export async function searchCustomers(query: string): Promise<CustomerSearchResu
   for (const ticket of tickets) {
     const key = ticket.customerEmail.toLowerCase()
     if (!byEmail.has(key)) {
-      byEmail.set(key, { email: ticket.customerEmail, account: ticket.customerAccount, tickets: [] })
+      byEmail.set(key, { email: ticket.customerEmail, account: ticket.customerAccount, tickets: [], riskFlags: [] })
     }
     byEmail.get(key)!.tickets.push({
       id: ticket.id,
@@ -56,7 +66,27 @@ export async function searchCustomers(query: string): Promise<CustomerSearchResu
     if (existing) {
       existing.account ??= account
     } else {
-      byEmail.set(key, { email: account.email, account, tickets: [] })
+      byEmail.set(key, { email: account.email, account, tickets: [], riskFlags: [] })
+    }
+  }
+
+  if (byEmail.size > 0) {
+    const riskFlags = await prisma.riskFlag.findMany({
+      where: { customerEmail: { in: Array.from(byEmail.keys()) } },
+      orderBy: { createdAt: "desc" },
+    })
+    for (const flag of riskFlags) {
+      const result = byEmail.get(flag.customerEmail!)
+      result?.riskFlags.push({
+        id: flag.id,
+        status: flag.status,
+        reason: flag.reason,
+        raisedByType: flag.raisedByType,
+        clearedNote: flag.clearedNote,
+        clearedAt: flag.clearedAt,
+        clearedByType: flag.clearedByType,
+        createdAt: flag.createdAt,
+      })
     }
   }
 

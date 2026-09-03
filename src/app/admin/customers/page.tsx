@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import StatusBadge from "@/components/status-badge"
 import CaseSearchInput from "@/components/case-search-input"
+import CustomerRiskFlagPanel from "@/app/admin/customers/customer-risk-flag-panel"
 
 export default async function AdminCustomersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams
@@ -30,13 +31,16 @@ export default async function AdminCustomersPage({ searchParams }: { searchParam
           <Card key={customer.email} className="p-6 space-y-3">
             <div className="flex items-center justify-between">
               <p className="font-bold">{customer.email}</p>
-              {customer.account ? (
-                <Badge variant="cobalt">
-                  Account since {new Date(customer.account.createdAt).toLocaleDateString()}
-                </Badge>
-              ) : (
-                <Badge variant="outline">No account</Badge>
-              )}
+              <div className="flex items-center gap-2">
+                {customer.riskFlags.some((f) => f.status === "OPEN") && <Badge variant="danger">Risk flagged</Badge>}
+                {customer.account ? (
+                  <Badge variant="cobalt">
+                    Account since {new Date(customer.account.createdAt).toLocaleDateString()}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline">No account</Badge>
+                )}
+              </div>
             </div>
 
             {customer.tickets.length === 0 ? (
@@ -60,6 +64,20 @@ export default async function AdminCustomersPage({ searchParams }: { searchParam
                 ))}
               </div>
             )}
+
+            <CustomerRiskFlagPanel
+              email={customer.email}
+              riskFlags={customer.riskFlags.map((f) => ({
+                id: f.id,
+                status: f.status,
+                reason: f.reason,
+                raisedByType: f.raisedByType,
+                clearedNote: f.clearedNote,
+                clearedAt: f.clearedAt?.toISOString() ?? null,
+                clearedByType: f.clearedByType,
+                createdAt: f.createdAt.toISOString(),
+              }))}
+            />
           </Card>
         ))}
       </div>
