@@ -48,13 +48,14 @@ This document prevents assumptions from silently becoming business rules.
 - Retention policy for archived categories and terminated businesses: TBD
 
 ## Customer Access & Tracking
-- Whether the optional persistent account (Section 6b, `11_UX_UI_SYSTEM.md`) is offered at request submission, at case closure, or only on a customer's later return visit: TBD
 - Magic-link token lifetime while a case is active: TBD
 - Whether an active-case magic link is single-use (re-issued each visit) or reusable until case closure: TBD
 - Resend/rate-limiting rules for magic-link requests (to prevent abuse without frustrating legitimate customers): TBD
 - Whether SMS is offered as a fallback delivery channel for the tracking link where email is unreliable: TBD
 
 **Resolved:** Post-closure record retrieval always routes through Customer Support, with the customer's identity and approval verified before the record is re-sent — never self-service or a re-issuable link. See `03_CUSTOMER_JOURNEY.md`, Section 10.1, and `07_OPERATIONS_AND_ORG.md`, Section 6.
+
+**Resolved:** The optional persistent account (Section 6b, `11_UX_UI_SYSTEM.md`) is offered from two points, never from the request form itself: the live case dashboard (a dismissible, skippable card) and the closure-summary email (a one-line CTA). Requesting a login link find-or-creates the account and backfills any existing tickets sharing that email; every later request from a known email links up automatically with no customer action. This keeps the feature additive per Section 6b — it can never block submitting or tracking a single request. See `src/server/services/customer-accounts.ts`.
 
 ## Technology
 - Hosting provider: TBD
