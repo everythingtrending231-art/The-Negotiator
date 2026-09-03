@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { formatCents } from "@/lib/money"
 import SiteHeader from "@/components/site-header"
+import SaveToAccountCard from "@/app/case/[token]/save-to-account-card"
 
 // A financial figure this size is the moment of the whole page — it earns
 // a count-up rather than just appearing. No "already started" guard: the
@@ -147,6 +148,7 @@ export default function CaseDashboard(props: {
   estimatedNextUpdateAt: string | null
   messages: Message[]
   offer: Offer | null
+  customerEmail: string
 }) {
   const router = useRouter()
   const [reply, setReply] = useState("")
@@ -415,6 +417,12 @@ export default function CaseDashboard(props: {
             </div>
           )}
         </motion.div>
+
+        {!isTerminal && (
+          <motion.div variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { duration: 0.4 } } }}>
+            <SaveToAccountCard email={props.customerEmail} />
+          </motion.div>
+        )}
 
         {!isTerminal && (
           <motion.div

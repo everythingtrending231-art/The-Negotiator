@@ -5,6 +5,7 @@ import { issueAccessToken, revokeTicketTokens, buildCaseUrl } from "@/server/ser
 import { buildFeedbackUrl, issueFeedbackToken } from "@/server/services/feedback"
 import { sendEmail } from "@/server/email/send"
 import { getSetting } from "@/server/services/settings"
+import { buildAccountUrl } from "@/server/services/customer-accounts"
 
 // PRD §7 names these five as terminal (they trigger dashboard-access
 // closure per §6a). Completed/Disputed are treated as non-terminal
@@ -108,6 +109,7 @@ async function sendClosureSummaryEmail(caseId: string) {
         : null,
       supportEmail,
       feedbackUrl: buildFeedbackUrl(feedbackToken),
+      accountUrl: buildAccountUrl(),
     },
   })
 }
@@ -197,8 +199,19 @@ export async function createCase(input: CreateCaseInput) {
       sourceChannel: "web",
     })
 
+    // Auto-aggregate under an existing account (docs/08 §4.3) — a
+    // returning customer's new tickets link up without them re-doing
+    // anything; a customer without an account is entirely unaffected.
+    const existingAccount = await tx.customerAccount.findUnique({
+      where: { email: input.email.toLowerCase() },
+    })
+
     const ticket = await tx.negotiationTicket.create({
-      data: { negotiationCaseId: negotiationCase.id, customerEmail: input.email },
+      data: {
+        negotiationCaseId: negotiationCase.id,
+        customerEmail: input.email,
+        customerAccountId: existingAccount?.id,
+      },
     })
 
     const { raw } = await issueAccessToken(tx, ticket.id, negotiationCase.id)

@@ -14,6 +14,12 @@ export default function SiteHeader({ tagline }: { tagline?: string }) {
       <div className="flex items-center gap-4">
         {tagline && <span className="hidden sm:inline text-sm italic font-serif text-ink-soft">{tagline}</span>}
         <Link
+          href="/account"
+          className="text-sm font-bold text-cobalt-600 opacity-80 hover:opacity-100 hover:underline underline-offset-4 transition-opacity"
+        >
+          My account
+        </Link>
+        <Link
           href="/login"
           className="text-sm font-bold text-cobalt-600 opacity-80 hover:opacity-100 hover:underline underline-offset-4 transition-opacity"
         >

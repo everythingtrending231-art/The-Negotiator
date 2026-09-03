@@ -2,6 +2,7 @@ import { prisma } from "@/server/db"
 import {
   ticketConfirmationEmail,
   magicLinkResendEmail,
+  accountMagicLinkEmail,
   closureSummaryEmail,
   offerReadyEmail,
   inviteReceivedEmail,
@@ -11,6 +12,7 @@ import {
   supportInquiryEmail,
   type TicketConfirmationData,
   type MagicLinkResendData,
+  type AccountMagicLinkData,
   type ClosureSummaryData,
   type OfferReadyData,
   type InviteReceivedData,
@@ -23,6 +25,7 @@ import {
 type TemplateMap = {
   "ticket-confirmation": TicketConfirmationData
   "magic-link-resend": MagicLinkResendData
+  "account-magic-link": AccountMagicLinkData
   "closure-summary": ClosureSummaryData
   "offer-ready": OfferReadyData
   "invite-received": InviteReceivedData
@@ -40,6 +43,8 @@ function render<T extends EmailTemplate>(template: T, data: TemplateMap[T]) {
       return ticketConfirmationEmail(data as TicketConfirmationData)
     case "magic-link-resend":
       return magicLinkResendEmail(data as MagicLinkResendData)
+    case "account-magic-link":
+      return accountMagicLinkEmail(data as AccountMagicLinkData)
     case "closure-summary":
       return closureSummaryEmail(data as ClosureSummaryData)
     case "offer-ready":

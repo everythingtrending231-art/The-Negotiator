@@ -73,7 +73,7 @@ Since customers do not create a password-based account to submit a request, the 
 - **Status language stays human** (see Section 7) even in access-related messaging — e.g. “This negotiation has been completed. We've emailed you the details,” not “Token expired.”
 
 ## 6b. Optional Persistent Account UI
-A customer may optionally link multiple tickets to one email-based account (same passwordless, magic-link pattern — no new mechanism to design). Where this option is surfaced (at submission, at closure, or on a later visit) is an open decision — see `21_OPEN_DECISIONS.md`, Customer Access & Tracking. Until resolved, design should treat this as additive and skippable, never a blocker to submitting or tracking a single request.
+A customer may optionally link multiple tickets to one email-based account (same passwordless, magic-link pattern — no new mechanism to design). Resolved (see `21_OPEN_DECISIONS.md`, Customer Access & Tracking): the option is surfaced from the live case dashboard and the closure-summary email, never at submission — additive and skippable, never a blocker to submitting or tracking a single request.
 
 ## 7. Status Language
 Use human language:

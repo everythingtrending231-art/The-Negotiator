@@ -14,8 +14,8 @@ function getSecret() {
   return secret
 }
 
-export function createSessionToken(userId: string) {
-  const payload = JSON.stringify({ sub: userId, exp: Date.now() + SESSION_TTL_MS })
+export function createSessionToken(userId: string, ttlMs: number = SESSION_TTL_MS) {
+  const payload = JSON.stringify({ sub: userId, exp: Date.now() + ttlMs })
   const payloadB64 = Buffer.from(payload).toString("base64url")
   const signature = crypto.createHmac("sha256", getSecret()).update(payloadB64).digest("base64url")
   return `${payloadB64}.${signature}`
