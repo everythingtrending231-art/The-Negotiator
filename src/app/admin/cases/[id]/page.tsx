@@ -39,6 +39,7 @@ export default async function AdminCaseDetailPage({ params }: { params: Promise<
         publicRef: negotiationCase.publicRef,
         status: negotiationCase.status,
         description: negotiationCase.description,
+        attachmentUrls: negotiationCase.attachmentUrls,
         categoryName: negotiationCase.category.name,
         businessName: negotiationCase.business?.name ?? null,
         customerEmail: negotiationCase.ticket?.customerEmail ?? "",

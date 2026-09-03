@@ -20,6 +20,7 @@ type NegotiationCase = {
   publicRef: string
   status: string
   description: string
+  attachmentUrls: string[]
   categoryName: string
   businessName: string | null
   customerEmail: string
@@ -136,6 +137,21 @@ export default function AdminCaseDetail(props: {
       <Card className="p-6 space-y-3">
         <p className="text-sm text-ink-muted">Customer: {c.customerEmail}</p>
         <p>{c.description}</p>
+        {c.attachmentUrls.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {c.attachmentUrls.map((url, i) => (
+              <a
+                key={url}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm underline text-cobalt-600"
+              >
+                Attachment {i + 1}
+              </a>
+            ))}
+          </div>
+        )}
         {c.businessName && <p className="text-sm text-ink-soft">Business: {c.businessName}</p>}
         {c.escalated && c.escalatedReason && (
           <p className="text-sm text-rose-700">Escalation reason: {c.escalatedReason}</p>

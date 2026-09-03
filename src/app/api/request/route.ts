@@ -23,6 +23,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "email, categoryId, and description are required" }, { status: 400 })
   }
 
+  // Attachment URLs come from the client after a direct-to-Blob upload
+  // (see /api/request/upload) — validate they're actually our own Blob
+  // objects rather than trusting arbitrary strings, since these get
+  // rendered as links/images in internal portals later.
+  const attachmentUrlsInput = Array.isArray(body?.attachmentUrls) ? body.attachmentUrls : []
+  const attachmentUrls = attachmentUrlsInput
+    .filter((url: unknown): url is string => typeof url === "string")
+    .filter((url: string) => {
+      try {
+        return new URL(url).hostname.endsWith(".public.blob.vercel-storage.com")
+      } catch {
+        return false
+      }
+    })
+    .slice(0, 5)
+
   const category = await prisma.category.findUnique({ where: { id: categoryId } })
   if (!category || !category.customerVisible || category.status !== "ACTIVE") {
     return NextResponse.json({ error: "Invalid category" }, { status: 400 })
@@ -62,6 +78,7 @@ export async function POST(request: Request) {
     categoryFieldValues:
       body?.categoryFieldValues && typeof body.categoryFieldValues === "object" ? body.categoryFieldValues : undefined,
     customerPreferredBusinessId,
+    attachmentUrls,
   })
 
   return NextResponse.json({ caseRef: negotiationCase.publicRef }, { status: 201 })

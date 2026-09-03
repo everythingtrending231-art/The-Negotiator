@@ -2,10 +2,12 @@
 
 import { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, X } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { uploadPresigned } from "@vercel/blob/client"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -48,11 +50,24 @@ const requestSchema = z.object({
 
 type RequestFormValues = z.infer<typeof requestSchema>
 
+const ATTACHMENT_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"]
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024 // 10 MB
+const MAX_ATTACHMENTS = 5
+
+type Attachment = {
+  id: string
+  file: File
+  status: "uploading" | "done" | "error"
+  url?: string
+  error?: string
+}
+
 export default function RequestForm({ categories }: { categories: Category[] }) {
   const [submitted, setSubmitted] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
   const [categoryFieldValues, setCategoryFieldValues] = useState<Record<string, string>>({})
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [attachments, setAttachments] = useState<Attachment[]>([])
 
   const form = useForm<RequestFormValues>({
     resolver: zodResolver(requestSchema),
@@ -73,8 +88,59 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
 
   const selectedCategory = categories.find((category) => category.id === form.watch("categoryId"))
 
+  async function handleFilesSelected(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return
+    const files = Array.from(fileList)
+
+    if (attachments.length + files.length > MAX_ATTACHMENTS) {
+      toast.error(`You can attach up to ${MAX_ATTACHMENTS} files.`)
+      return
+    }
+
+    for (const file of files) {
+      if (!ATTACHMENT_MIME_TYPES.includes(file.type)) {
+        toast.error(`${file.name}: unsupported file type. Use JPEG, PNG, WebP, GIF, or PDF.`)
+        continue
+      }
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        toast.error(`${file.name} is too large (max ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB).`)
+        continue
+      }
+
+      const id = crypto.randomUUID()
+      setAttachments((prev) => [...prev, { id, file, status: "uploading" }])
+
+      try {
+        const blob = await uploadPresigned(`request-attachments/${file.name}`, file, {
+          access: "public",
+          handleUploadUrl: "/api/request/upload",
+          // See content-editor.tsx for why this is capped — an
+          // unclassifiable rejection otherwise retries for minutes.
+          abortSignal: AbortSignal.timeout(30_000),
+        })
+        setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "done", url: blob.url } : a)))
+      } catch (error) {
+        setAttachments((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, status: "error", error: (error as Error).message } : a)),
+        )
+      }
+    }
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((prev) => prev.filter((a) => a.id !== id))
+  }
+
   async function onSubmit(values: RequestFormValues) {
     setServerError(null)
+
+    if (attachments.some((a) => a.status === "uploading")) {
+      setServerError("Please wait for your attachments to finish uploading.")
+      return
+    }
+
+    const attachmentUrls = attachments.filter((a) => a.status === "done" && a.url).map((a) => a.url as string)
+
     const res = await fetch("/api/request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -82,6 +148,7 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
         ...values,
         quantity: values.quantity ? Number(values.quantity) : undefined,
         categoryFieldValues,
+        attachmentUrls,
       }),
     })
 
@@ -438,6 +505,55 @@ export default function RequestForm({ categories }: { categories: Category[] }) 
                   </FormItem>
                 )}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="attachments">
+                Photos or files{" "}
+                <span className="font-normal text-ink-muted">
+                  (optional — up to {MAX_ATTACHMENTS}, {MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB each)
+                </span>
+              </Label>
+              <input
+                id="attachments"
+                type="file"
+                multiple
+                accept={ATTACHMENT_MIME_TYPES.join(",")}
+                onChange={(event) => {
+                  handleFilesSelected(event.target.files)
+                  event.target.value = ""
+                }}
+                className="block w-full text-sm text-ink-muted file:mr-4 file:rounded-pill file:border-0 file:bg-cobalt-600 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white file:cursor-pointer hover:file:bg-cobalt-700"
+              />
+              {attachments.length > 0 && (
+                <ul className="space-y-2">
+                  {attachments.map((attachment) => (
+                    <li
+                      key={attachment.id}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-border bg-cream-100 px-3 py-2 text-sm"
+                    >
+                      <span className="truncate">{attachment.file.name}</span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        {attachment.status === "uploading" && (
+                          <span className="text-xs text-ink-muted">Uploading…</span>
+                        )}
+                        {attachment.status === "error" && (
+                          <span className="text-xs text-destructive">{attachment.error ?? "Failed"}</span>
+                        )}
+                        {attachment.status === "done" && <span className="text-xs text-emerald-700">Attached</span>}
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(attachment.id)}
+                          aria-label={`Remove ${attachment.file.name}`}
+                          className="text-ink-muted hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <FormField
