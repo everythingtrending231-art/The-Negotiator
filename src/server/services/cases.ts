@@ -2,8 +2,8 @@ import type { ActorType, CaseStatus, Prisma } from "@prisma/client"
 import { prisma } from "@/server/db"
 import { recordAudit } from "@/server/audit"
 import { issueAccessToken, revokeTicketTokens, buildCaseUrl } from "@/server/services/tokens"
-import { buildFeedbackUrl, issueFeedbackToken } from "@/server/services/feedback"
-import { buildTicketUrl, issueDealTicket } from "@/server/services/deal-tickets"
+import { buildFeedbackUrl, issueFeedbackToken, reissueFeedbackToken } from "@/server/services/feedback"
+import { buildTicketUrl, issueDealTicket, reissueDealTicketToken } from "@/server/services/deal-tickets"
 import { generateTicketQrCodePngBuffer } from "@/server/services/deal-ticket-qr"
 import { renderDealTicketPdf } from "@/server/services/deal-ticket-pdf"
 import { sendEmail, type EmailAttachment } from "@/server/email/send"
@@ -422,6 +422,107 @@ export async function adminForceCloseCase(caseId: string, adminId: string, reaso
   }
 
   return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+}
+
+// docs/07_OPERATIONS_AND_ORG.md §6.1 SOP — the sole channel for a customer
+// to get their record after the case's own dashboard/magic-link access has
+// ended (docs/03 §10.1: never self-service). Support verifies identity and
+// obtains approval *before* calling this — the verificationNote is that
+// evidence, recorded in the audit trail per the SOP's step 6. Reissues
+// fresh tokens for the feedback survey (if not yet answered) and the deal
+// ticket (if one was issued) rather than reusing the originals, since
+// their raw tokens were never persisted — same "revoke old, issue new"
+// shape the rest of this codebase already uses for resends.
+export async function resendClosureRecord(caseId: string, adminId: string, verificationNote: string) {
+  if (!verificationNote.trim()) {
+    throw new Error("A verification note is required.")
+  }
+
+  const negotiationCase = await prisma.negotiationCase.findUniqueOrThrow({
+    where: { id: caseId },
+    include: {
+      ticket: true,
+      business: true,
+      offers: { orderBy: { createdAt: "desc" } },
+      feedback: true,
+      dealTicket: true,
+    },
+  })
+  if (!negotiationCase.ticket) {
+    throw new Error("This case has no customer ticket.")
+  }
+  if (!isTerminal(negotiationCase.status)) {
+    throw new Error("This case hasn't closed yet.")
+  }
+
+  const latestOffer = negotiationCase.offers.find((offer) => offer.status !== "PROPOSED")
+  const supportEmail = await getSetting("supportEmail")
+
+  const feedbackUrl =
+    negotiationCase.feedback && !negotiationCase.feedback.submittedAt
+      ? buildFeedbackUrl(await reissueFeedbackToken(negotiationCase.feedback.id))
+      : null
+
+  let dealTicketUrl: string | null = null
+  let attachments: EmailAttachment[] | undefined
+  if (negotiationCase.dealTicket) {
+    const raw = await reissueDealTicketToken(caseId)
+    dealTicketUrl = buildTicketUrl(raw)
+    const qrCodePngBuffer = await generateTicketQrCodePngBuffer(dealTicketUrl)
+    const pdfBuffer = await renderDealTicketPdf(
+      {
+        publicRef: negotiationCase.publicRef,
+        businessName: negotiationCase.dealTicket.businessName,
+        categoryName: negotiationCase.dealTicket.categoryName,
+        finalPriceCents: negotiationCase.dealTicket.finalPriceCents,
+        currency: negotiationCase.dealTicket.currency,
+        includedGoods: negotiationCase.dealTicket.includedGoods,
+        additionalBenefits: negotiationCase.dealTicket.additionalBenefits,
+        conditions: negotiationCase.dealTicket.conditions,
+        paymentTerms: negotiationCase.dealTicket.paymentTerms,
+        deliveryTerms: negotiationCase.dealTicket.deliveryTerms,
+        validUntil: negotiationCase.dealTicket.validUntil,
+        createdAt: negotiationCase.dealTicket.createdAt,
+      },
+      qrCodePngBuffer,
+    )
+    attachments = [
+      { filename: `deal-ticket-${negotiationCase.publicRef}.pdf`, content: pdfBuffer, contentType: "application/pdf" },
+    ]
+  }
+
+  await sendEmail({
+    to: negotiationCase.ticket.customerEmail,
+    template: "closure-summary",
+    data: {
+      caseRef: negotiationCase.publicRef,
+      status: negotiationCase.status,
+      offerSummary: latestOffer
+        ? {
+            finalPriceCents: latestOffer.finalPriceCents,
+            currency: latestOffer.currency,
+            includedGoods: latestOffer.includedGoods,
+            businessName: negotiationCase.business?.name,
+          }
+        : null,
+      supportEmail,
+      feedbackUrl,
+      accountUrl: buildAccountUrl(),
+      dealTicketUrl,
+    },
+    attachments,
+  })
+
+  await prisma.$transaction((tx) =>
+    recordAudit(tx, {
+      actorType: "ADMIN",
+      actorId: adminId,
+      caseId,
+      action: "POST_CLOSURE_RECORD_RESENT",
+      after: { verificationNote, to: negotiationCase.ticket!.customerEmail },
+      sourceChannel: "internal",
+    }),
+  )
 }
 
 export type CustomerDecision = "ACCEPTED" | "DECLINED" | "REQUESTED_ANOTHER_ROUND"

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest"
 import { testPrisma } from "@/server/test/db"
-import { createBusiness, createCase, createCategory, createNegotiator, createOffer, createTicket } from "@/server/test/factories"
+import {
+  createBusiness,
+  createCase,
+  createCategory,
+  createNegotiator,
+  createOffer,
+  createTicket,
+  createUser,
+} from "@/server/test/factories"
 import {
   adminForceCloseCase,
   adminReassignCase,
@@ -8,6 +16,7 @@ import {
   createCase as createCaseService,
   escalateCase,
   recordCustomerDecision,
+  resendClosureRecord,
   setCaseStatus,
   unescalateCase,
 } from "./cases"
@@ -292,5 +301,68 @@ describe("recordCustomerDecision", () => {
     const offer = await createOffer({ caseId: negotiationCase.id, status: "PRESENTED" })
 
     await expect(recordCustomerDecision(negotiationCase.id, offer.id, "ACCEPTED")).rejects.toThrow("already closed")
+  })
+})
+
+describe("resendClosureRecord", () => {
+  it("resends the closure summary and reissues the deal ticket, recording an audit row", async () => {
+    const negotiationCase = await createCase({ status: "OFFER_READY" })
+    await createTicket({ negotiationCaseId: negotiationCase.id, customerEmail: "resend-test@example.com" })
+    const offer = await createOffer({ caseId: negotiationCase.id, status: "PRESENTED" })
+    const admin = await createUser({ role: "ADMIN" })
+
+    await recordCustomerDecision(negotiationCase.id, offer.id, "ACCEPTED")
+
+    const emailsBefore = await testPrisma.emailLog.count({
+      where: { template: "closure-summary", to: "resend-test@example.com" },
+    })
+    expect(emailsBefore).toBe(1)
+
+    const dealTicketBefore = await testPrisma.dealTicket.findUniqueOrThrow({ where: { caseId: negotiationCase.id } })
+
+    await resendClosureRecord(negotiationCase.id, admin.id, "Verified caller via phone, matched name and email on file.")
+
+    const emailsAfter = await testPrisma.emailLog.count({
+      where: { template: "closure-summary", to: "resend-test@example.com" },
+    })
+    expect(emailsAfter).toBe(2)
+
+    // Reissued, not the same token — the original raw value was never
+    // persisted, so a resend has to mint a fresh one.
+    const dealTicketAfter = await testPrisma.dealTicket.findUniqueOrThrow({ where: { caseId: negotiationCase.id } })
+    expect(dealTicketAfter.tokenHash).not.toBe(dealTicketBefore.tokenHash)
+
+    const audit = await testPrisma.auditLog.findFirst({
+      where: { caseId: negotiationCase.id, action: "POST_CLOSURE_RECORD_RESENT" },
+    })
+    expect(audit).not.toBeNull()
+    expect((audit?.afterJson as { verificationNote?: string })?.verificationNote).toContain("Verified caller")
+  })
+
+  it("rejects an empty verification note", async () => {
+    const negotiationCase = await createCase({ status: "CLOSED" })
+    await createTicket({ negotiationCaseId: negotiationCase.id })
+    const admin = await createUser({ role: "ADMIN" })
+
+    await expect(resendClosureRecord(negotiationCase.id, admin.id, "   ")).rejects.toThrow("verification note is required")
+  })
+
+  it("rejects a case that hasn't closed yet", async () => {
+    const negotiationCase = await createCase({ status: "NEGOTIATING" })
+    await createTicket({ negotiationCaseId: negotiationCase.id })
+    const admin = await createUser({ role: "ADMIN" })
+
+    await expect(
+      resendClosureRecord(negotiationCase.id, admin.id, "Verified via phone."),
+    ).rejects.toThrow("hasn't closed yet")
+  })
+
+  it("rejects a case with no customer ticket", async () => {
+    const negotiationCase = await createCase({ status: "CLOSED" })
+    const admin = await createUser({ role: "ADMIN" })
+
+    await expect(
+      resendClosureRecord(negotiationCase.id, admin.id, "Verified via phone."),
+    ).rejects.toThrow("no customer ticket")
   })
 })

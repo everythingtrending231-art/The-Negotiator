@@ -54,6 +54,18 @@ export async function issueDealTicket(caseId: string, snapshot: DealTicketSnapsh
   return raw
 }
 
+// Overwrites the existing ticket's tokenHash with a freshly generated one —
+// same "revoke old, issue new" shape as tokens.ts's resend flow. Used by
+// cases.ts::resendClosureRecord (docs/07 §6.1): the original link was
+// already emailed and its raw token was never persisted, so a resend has
+// to mint a new one rather than re-derive the old link. The ticket's
+// snapshot content is untouched — only the access token changes.
+export async function reissueDealTicketToken(caseId: string) {
+  const raw = generateRawToken()
+  await prisma.dealTicket.update({ where: { caseId }, data: { tokenHash: hashToken(raw) } })
+  return raw
+}
+
 export async function resolveDealTicket(rawToken: string) {
   const tokenHash = hashToken(rawToken)
   return prisma.dealTicket.findUnique({
