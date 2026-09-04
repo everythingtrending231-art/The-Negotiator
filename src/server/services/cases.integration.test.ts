@@ -169,6 +169,13 @@ describe("setCaseStatus", () => {
     const offerReadyEmails = await testPrisma.emailLog.findMany({ where: { template: "offer-ready", to: "offer-ready@example.com" } })
     expect(offerReadyEmails).toHaveLength(1)
   })
+
+  it("refuses to change the status of an already-terminal case", async () => {
+    const negotiationCase = await createCase({ status: "CLOSED" })
+    const negotiator = await createNegotiator()
+
+    await expect(setCaseStatus(negotiationCase.id, "NEGOTIATING", negotiator.id)).rejects.toThrow("already closed")
+  })
 })
 
 describe("escalateCase / unescalateCase", () => {
@@ -300,6 +307,20 @@ describe("recordCustomerDecision", () => {
 
     const ticket = await testPrisma.dealTicket.findUnique({ where: { caseId: negotiationCase.id } })
     expect(ticket).toBeNull()
+  })
+
+  it("does not present a declined offer's terms as 'final' in the closure summary email", async () => {
+    const negotiationCase = await createCase({ status: "OFFER_READY" })
+    await createTicket({ negotiationCaseId: negotiationCase.id, customerEmail: "declined-terms@example.com" })
+    const offer = await createOffer({ caseId: negotiationCase.id, status: "PRESENTED" })
+
+    await recordCustomerDecision(negotiationCase.id, offer.id, "DECLINED")
+
+    const email = await testPrisma.emailLog.findFirstOrThrow({
+      where: { template: "closure-summary", to: "declined-terms@example.com" },
+    })
+    const data = email.dataJson as { offerSummary?: unknown }
+    expect(data.offerSummary).toBeNull()
   })
 
   it("requests another round: case -> NEGOTIATING, offer -> SUPERSEDED, no deal ticket", async () => {
