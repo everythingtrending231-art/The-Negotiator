@@ -38,6 +38,16 @@ export async function issueFeedbackToken(caseId: string, negotiatorId: string | 
   return raw
 }
 
+// Same "revoke old, issue new" shape as deal-tickets.ts's reissue — used
+// only by cases.ts::resendClosureRecord (docs/07 §6.1) when a customer's
+// feedback is still unanswered, so a resent closure record can offer a
+// working survey link (the original raw token was never persisted).
+export async function reissueFeedbackToken(feedbackId: string) {
+  const raw = generateRawToken()
+  await prisma.feedback.update({ where: { id: feedbackId }, data: { tokenHash: hashToken(raw) } })
+  return raw
+}
+
 // Not-found and already-submitted are both surfaced to the caller (unlike
 // resolveAccessToken, which collapses every failure to the same generic
 // state) — the feedback page shows a distinct, friendlier "you already

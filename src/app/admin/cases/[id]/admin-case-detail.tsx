@@ -92,6 +92,7 @@ export default function AdminCaseDetail(props: {
 
   const [reassignTo, setReassignTo] = useState(c.assignedNegotiatorId ?? props.negotiators[0]?.id ?? "")
   const [forceCloseReason, setForceCloseReason] = useState("")
+  const [resendClosureNote, setResendClosureNote] = useState("")
   const [busy, setBusy] = useState(false)
   const [showDisputeForm, setShowDisputeForm] = useState(false)
   const [disputeReason, setDisputeReason] = useState("")
@@ -103,6 +104,7 @@ export default function AdminCaseDetail(props: {
 
   const reassignConfirm = useConfirmDialog()
   const forceCloseConfirm = useConfirmDialog()
+  const resendClosureConfirm = useConfirmDialog()
 
   async function openDisputeAction() {
     if (!disputeReason.trim()) return
@@ -238,6 +240,25 @@ export default function AdminCaseDetail(props: {
     router.refresh()
   }
 
+  async function resendClosureRecordAction() {
+    if (!resendClosureNote.trim()) return
+    setBusy(true)
+    const res = await fetch(`/api/admin/cases/${c.id}/resend-closure`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ verificationNote: resendClosureNote }),
+    })
+    setBusy(false)
+    resendClosureConfirm.setOpen(false)
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      toast.error(body?.error ?? "Couldn't resend the closure record.")
+      return
+    }
+    toast.success(`Closure record resent to ${c.customerEmail}.`)
+    setResendClosureNote("")
+  }
+
   const isClosed = ["ACCEPTED", "DECLINED", "EXPIRED", "CANCELLED", "CLOSED"].includes(c.status)
 
   const hasAcceptedOffer = props.offers.some((o) => o.customerDecision === "ACCEPTED")
@@ -329,6 +350,35 @@ export default function AdminCaseDetail(props: {
               />
               <Button size="sm" variant="destructive" onClick={() => forceCloseConfirm.setOpen(true)}>
                 Force-close case
+              </Button>
+            </>
+          )}
+        </div>
+
+        <div className="pt-3 border-t border-border space-y-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-ink-muted">Override: resend closure record</p>
+          {!isClosed ? (
+            <p className="text-sm text-ink-muted">This case hasn&apos;t closed yet.</p>
+          ) : (
+            <>
+              <p className="text-xs text-ink-muted">
+                Only after verifying the requester&apos;s identity and getting their approval (docs/07 §6.1) — never
+                self-service. Re-sends the closure summary (and a fresh deal ticket link/PDF, if one was issued) to{" "}
+                {c.customerEmail}.
+              </p>
+              <Textarea
+                rows={2}
+                value={resendClosureNote}
+                onChange={(e) => setResendClosureNote(e.target.value)}
+                placeholder="Verification note — how identity/approval was confirmed (recorded in the audit log)"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!resendClosureNote.trim()}
+                onClick={() => resendClosureConfirm.setOpen(true)}
+              >
+                Resend closure record
               </Button>
             </>
           )}
@@ -674,6 +724,16 @@ export default function AdminCaseDetail(props: {
         destructive
         busy={busy}
         onConfirm={forceClose}
+      />
+      <ConfirmDialog
+        open={resendClosureConfirm.open}
+        onOpenChange={resendClosureConfirm.setOpen}
+        title="Resend the closure record?"
+        description={`This sends the closure summary email to ${c.customerEmail} again, with a fresh deal ticket link/PDF if one exists. Confirm you've verified their identity and obtained approval first.`}
+        confirmLabel="Resend"
+        destructive={false}
+        busy={busy}
+        onConfirm={resendClosureRecordAction}
       />
     </div>
   )
