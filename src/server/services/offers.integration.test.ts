@@ -113,6 +113,16 @@ describe("confirmOffer", () => {
 
     await expect(confirmOffer(negotiationCase.id, offer.id, contact.id)).rejects.toThrow("already been confirmed")
   })
+
+  it("refuses to confirm an offer that belongs to a different case", async () => {
+    const business = await createBusiness()
+    const caseA = await createCase({ status: "AWAITING_BUSINESS", businessId: business.id })
+    const caseB = await createCase({ status: "AWAITING_BUSINESS", businessId: business.id })
+    const offerForCaseB = await createOffer({ caseId: caseB.id, businessId: business.id, status: "PROPOSED" })
+    const contact = await createBusinessContact({ businessId: business.id })
+
+    await expect(confirmOffer(caseA.id, offerForCaseB.id, contact.id)).rejects.toThrow("does not belong to this case")
+  })
 })
 
 describe("requestOfferChanges", () => {
@@ -143,6 +153,18 @@ describe("requestOfferChanges", () => {
     const contact = await createBusinessContact({ businessId: business.id })
 
     await expect(requestOfferChanges(negotiationCase.id, offer.id, contact.id, "note")).rejects.toThrow("already been confirmed")
+  })
+
+  it("refuses to request changes on an offer that belongs to a different case", async () => {
+    const business = await createBusiness()
+    const caseA = await createCase({ businessId: business.id })
+    const caseB = await createCase({ businessId: business.id })
+    const offerForCaseB = await createOffer({ caseId: caseB.id, businessId: business.id })
+    const contact = await createBusinessContact({ businessId: business.id })
+
+    await expect(requestOfferChanges(caseA.id, offerForCaseB.id, contact.id, "note")).rejects.toThrow(
+      "does not belong to this case",
+    )
   })
 })
 

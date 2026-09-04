@@ -84,9 +84,10 @@ async function sendClosureSummaryEmail(caseId: string, dealTicketUrl?: string | 
   })
   if (!negotiationCase.ticket) return
 
-  // A Negotiator-drafted PROPOSED offer the business never confirmed must
-  // never appear in the customer's closure summary either.
-  const latestOffer = negotiationCase.offers.find((offer) => offer.status !== "PROPOSED")
+  // Only an ACCEPTED offer represents actual "final terms" — a
+  // DECLINED/SUPERSEDED/EXPIRED offer must never be shown as such (CLAUDE.md
+  // rule #1: never imply a finalized outcome that isn't real).
+  const latestOffer = negotiationCase.offers.find((offer) => offer.status === "ACCEPTED")
 
   // Issued here, not earlier — this is the one point every terminal-status
   // path already funnels through exactly once (guarded by
@@ -300,6 +301,9 @@ export async function assignNegotiator(caseId: string, negotiatorId: string) {
 
 export async function setCaseStatus(caseId: string, newStatus: CaseStatus, negotiatorId: string) {
   const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+  if (isTerminal(existing.status)) {
+    throw new Error("This case is already closed.")
+  }
 
   const { shouldSendClosureSummary, shouldSendOfferReady } = await prisma.$transaction((tx) =>
     applyStatusChangeInTx(tx, existing, newStatus, { actorType: "NEGOTIATOR", actorId: negotiatorId }, "internal"),
@@ -498,7 +502,9 @@ export async function resendClosureRecord(caseId: string, adminId: string, verif
     throw new Error("This case hasn't closed yet.")
   }
 
-  const latestOffer = negotiationCase.offers.find((offer) => offer.status !== "PROPOSED")
+  // Only an ACCEPTED offer represents actual "final terms" — see the same
+  // guard in sendClosureSummaryEmail above.
+  const latestOffer = negotiationCase.offers.find((offer) => offer.status === "ACCEPTED")
   const supportEmail = await getSetting("supportEmail")
 
   const feedbackUrl =

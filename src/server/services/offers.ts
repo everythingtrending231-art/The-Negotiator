@@ -102,6 +102,9 @@ export async function confirmOffer(caseId: string, offerId: string, businessCont
   const existingCase = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
   const existingOffer = await prisma.offer.findUniqueOrThrow({ where: { id: offerId } })
 
+  if (existingOffer.caseId !== caseId) {
+    throw new Error("This offer does not belong to this case.")
+  }
   if (existingOffer.customerDecision) {
     throw new Error("The customer has already decided on this offer.")
   }
@@ -157,6 +160,9 @@ export async function confirmOffer(caseId: string, offerId: string, businessCont
 export async function requestOfferChanges(caseId: string, offerId: string, businessContactId: string, note: string) {
   const existingOffer = await prisma.offer.findUniqueOrThrow({ where: { id: offerId } })
 
+  if (existingOffer.caseId !== caseId) {
+    throw new Error("This offer does not belong to this case.")
+  }
   if (existingOffer.businessConfirmedAt) {
     throw new Error("This offer has already been confirmed and can no longer be sent back for changes.")
   }
