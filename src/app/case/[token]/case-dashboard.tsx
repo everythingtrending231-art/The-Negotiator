@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { formatCents } from "@/lib/money"
 import SiteHeader from "@/components/site-header"
 import SaveToAccountCard from "@/app/case/[token]/save-to-account-card"
+import ConfirmDialog, { useConfirmDialog } from "@/components/confirm-dialog"
 
 // A financial figure this size is the moment of the whole page — it earns
 // a count-up rather than just appearing. No "already started" guard: the
@@ -154,6 +155,7 @@ export default function CaseDashboard(props: {
   const [reply, setReply] = useState("")
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const withdrawConfirm = useConfirmDialog()
   // ACCEPTED/DECLINED are terminal — the same transaction that records the
   // decision also revokes this ticket's access tokens (docs/03 §10.1: post-
   // closure access is never self-service). Refetching via router.refresh()
@@ -166,13 +168,20 @@ export default function CaseDashboard(props: {
   // handed the link before this page's AccessToken dies, so it has to come
   // back in the decision response rather than a later fetch.
   const [dealTicketUrl, setDealTicketUrl] = useState<string | null>(null)
+  // Withdrawal is the same kind of terminal, self-triggered transition as
+  // ACCEPTED/DECLINED above — the token dies in the same request, so track
+  // it locally rather than refreshing into an expired link.
+  const [withdrawn, setWithdrawn] = useState(false)
 
-  const effectiveStatus = confirmedDecision ?? props.status
+  const effectiveStatus = withdrawn ? "CANCELLED" : (confirmedDecision ?? props.status)
   const effectiveOffer = props.offer ? { ...props.offer, customerDecision: confirmedDecision ?? props.offer.customerDecision } : null
 
   const isTerminal = TERMINAL_STATUSES.includes(effectiveStatus)
   const canDecide = effectiveOffer && !effectiveOffer.customerDecision && !isTerminal
   const { headline, stage } = statusInfo(effectiveStatus)
+  // Withdrawal is only offered before there's a live offer to react to —
+  // once one exists, Accept/Decline on the offer card is the right action.
+  const canWithdraw = !isTerminal && !props.offer
 
   async function sendReply() {
     if (!reply.trim()) return
@@ -219,6 +228,20 @@ export default function CaseDashboard(props: {
     const res = await fetch(`/api/case/${props.token}/resend`, { method: "POST" })
     setBusy(false)
     setNotice(res.ok ? "A fresh link is on its way to your email." : "Couldn't resend right now — try again shortly.")
+  }
+
+  async function withdraw() {
+    setBusy(true)
+    setNotice(null)
+    const res = await fetch(`/api/case/${props.token}/withdraw`, { method: "POST" })
+    setBusy(false)
+    withdrawConfirm.setOpen(false)
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      setNotice(body?.error ?? "Couldn't withdraw this request — try again shortly.")
+      return
+    }
+    setWithdrawn(true)
   }
 
   const priceValue = useCountUp(props.offer?.finalPriceCents ?? 0)
@@ -443,11 +466,16 @@ export default function CaseDashboard(props: {
         {!isTerminal && (
           <motion.div
             variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { duration: 0.4 } } }}
-            className="text-center"
+            className="text-center space-x-2"
           >
             <Button variant="ghost" disabled={busy} onClick={resend}>
               Resend my link
             </Button>
+            {canWithdraw && (
+              <Button variant="ghost" disabled={busy} onClick={() => withdrawConfirm.setOpen(true)}>
+                Withdraw my request
+              </Button>
+            )}
           </motion.div>
         )}
 
@@ -464,6 +492,17 @@ export default function CaseDashboard(props: {
           )}
         </AnimatePresence>
       </motion.div>
+
+      <ConfirmDialog
+        open={withdrawConfirm.open}
+        onOpenChange={withdrawConfirm.setOpen}
+        title="Withdraw this request?"
+        description="This cancels your request and ends this page's access — you'll get a confirmation by email. This can't be undone; submit a new request if you change your mind."
+        confirmLabel="Withdraw"
+        destructive
+        busy={busy}
+        onConfirm={withdraw}
+      />
     </div>
   )
 }
