@@ -86,6 +86,7 @@ type ActionKey =
   | "disputeResolve"
   | "raiseRiskFlag"
   | "clearRiskFlag"
+  | "cancel"
 type DisputeNote = { id: string; authorType: string; body: string; createdAt: string }
 type Dispute = {
   id: string
@@ -140,6 +141,8 @@ export default function CaseDetail(props: {
   const [selectedBusinessIds, setSelectedBusinessIds] = useState<string[]>([])
   const [showEscalateForm, setShowEscalateForm] = useState(false)
   const [escalateReason, setEscalateReason] = useState("")
+  const [showCancelForm, setShowCancelForm] = useState(false)
+  const [cancelReason, setCancelReason] = useState("")
   const [showDisputeForm, setShowDisputeForm] = useState(false)
   const [disputeReason, setDisputeReason] = useState("")
   const [disputeNoteBody, setDisputeNoteBody] = useState<Record<string, string>>({})
@@ -254,6 +257,24 @@ export default function CaseDetail(props: {
     )
   }
 
+  async function cancelCaseAction() {
+    if (!cancelReason.trim()) return
+    const ok = await runAction(
+      "cancel",
+      () =>
+        fetch(`/api/negotiator/cases/${props.negotiationCase.id}/cancel`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: cancelReason }),
+        }),
+      "Case cancelled."
+    )
+    if (ok) {
+      setCancelReason("")
+      setShowCancelForm(false)
+    }
+  }
+
   async function openDisputeAction() {
     if (!disputeReason.trim()) return
     const ok = await runAction(
@@ -354,6 +375,7 @@ export default function CaseDetail(props: {
   }
 
   const c = props.negotiationCase
+  const isClosed = ["ACCEPTED", "DECLINED", "EXPIRED", "CANCELLED", "CLOSED"].includes(c.status)
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-6">
@@ -482,6 +504,35 @@ export default function CaseDetail(props: {
             </>
           )}
         </div>
+
+        {!isClosed && (
+          <div className="pt-3 border-t border-border space-y-2">
+            <Button size="sm" variant="outline" onClick={() => setShowCancelForm((v) => !v)}>
+              {showCancelForm ? "Never mind" : "Cancel this case"}
+            </Button>
+            <AnimatePresence>
+              {showCancelForm && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="overflow-hidden space-y-2"
+                >
+                  <Textarea
+                    rows={2}
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    placeholder="Why is this being cancelled? (customer unreachable, business unable to serve, duplicate request…)"
+                  />
+                  <Button size="sm" variant="destructive" disabled={busy.cancel || !cancelReason.trim()} onClick={cancelCaseAction}>
+                    {busy.cancel ? "Cancelling…" : "Confirm cancellation"}
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </Card>
 
       <Tabs defaultValue="overview">

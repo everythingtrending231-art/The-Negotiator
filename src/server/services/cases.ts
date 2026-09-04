@@ -424,6 +424,49 @@ export async function adminForceCloseCase(caseId: string, adminId: string, reaso
   return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
 }
 
+// Negotiator/Admin override: cancels a case at any pre-terminal stage with a
+// required reason (docs/07_OPERATIONS_AND_ORG.md §7 names Cancellation
+// alongside Dispute/Fraud/High-value transaction as a required SOP, and
+// docs/02_PRODUCT_REQUIREMENTS.md §7 defines Cancelled as a distinct
+// terminal status from Closed). Distinct from adminForceCloseCase (→
+// CLOSED, reason optional) so the audit trail and customer-facing status
+// read differently for "we couldn't complete this" vs "we're calling this
+// off" (e.g. customer unreachable, business unable to serve, duplicate
+// request) — reason is required here since that distinction is the point.
+export async function cancelCase(
+  caseId: string,
+  actor: { actorType: "NEGOTIATOR" | "ADMIN"; actorId: string },
+  reason: string,
+) {
+  if (!reason.trim()) {
+    throw new Error("A cancellation reason is required.")
+  }
+  const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+  if (isTerminal(existing.status)) {
+    throw new Error("This case is already closed.")
+  }
+
+  const { shouldSendClosureSummary } = await prisma.$transaction(async (tx) => {
+    const result = await applyStatusChangeInTx(tx, existing, "CANCELLED", actor, "internal")
+    await recordAudit(tx, {
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      caseId,
+      action: "CASE_CANCELLED",
+      before: { status: existing.status },
+      after: { status: "CANCELLED", reason },
+      sourceChannel: "internal",
+    })
+    return result
+  })
+
+  if (shouldSendClosureSummary) {
+    await sendClosureSummaryEmail(caseId)
+  }
+
+  return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+}
+
 // docs/07_OPERATIONS_AND_ORG.md §6.1 SOP — the sole channel for a customer
 // to get their record after the case's own dashboard/magic-link access has
 // ended (docs/03 §10.1: never self-service). Support verifies identity and
@@ -523,6 +566,40 @@ export async function resendClosureRecord(caseId: string, adminId: string, verif
       sourceChannel: "internal",
     }),
   )
+}
+
+// Customer self-service withdrawal — the customer changed their mind before
+// any offer was presented for a decision. Once an offer reaches OFFER_READY
+// the customer already has Accept/Decline for it (recordCustomerDecision
+// below); withdrawal only covers backing out before it gets that far, so
+// the two paths never overlap.
+export async function withdrawCase(caseId: string) {
+  const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+  if (isTerminal(existing.status)) {
+    throw new Error("This case is already closed.")
+  }
+  if (existing.status === "OFFER_READY") {
+    throw new Error("An offer is ready for your review — accept or decline it instead of withdrawing.")
+  }
+
+  const { shouldSendClosureSummary } = await prisma.$transaction(async (tx) => {
+    const result = await applyStatusChangeInTx(tx, existing, "CANCELLED", { actorType: "CUSTOMER" }, "web")
+    await recordAudit(tx, {
+      actorType: "CUSTOMER",
+      caseId,
+      action: "CASE_WITHDRAWN",
+      before: { status: existing.status },
+      after: { status: "CANCELLED" },
+      sourceChannel: "web",
+    })
+    return result
+  })
+
+  if (shouldSendClosureSummary) {
+    await sendClosureSummaryEmail(caseId)
+  }
+
+  return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
 }
 
 export type CustomerDecision = "ACCEPTED" | "DECLINED" | "REQUESTED_ANOTHER_ROUND"

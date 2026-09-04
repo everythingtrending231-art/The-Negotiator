@@ -92,6 +92,7 @@ export default function AdminCaseDetail(props: {
 
   const [reassignTo, setReassignTo] = useState(c.assignedNegotiatorId ?? props.negotiators[0]?.id ?? "")
   const [forceCloseReason, setForceCloseReason] = useState("")
+  const [cancelReason, setCancelReason] = useState("")
   const [resendClosureNote, setResendClosureNote] = useState("")
   const [busy, setBusy] = useState(false)
   const [showDisputeForm, setShowDisputeForm] = useState(false)
@@ -104,6 +105,7 @@ export default function AdminCaseDetail(props: {
 
   const reassignConfirm = useConfirmDialog()
   const forceCloseConfirm = useConfirmDialog()
+  const cancelConfirm = useConfirmDialog()
   const resendClosureConfirm = useConfirmDialog()
 
   async function openDisputeAction() {
@@ -240,6 +242,26 @@ export default function AdminCaseDetail(props: {
     router.refresh()
   }
 
+  async function cancelCaseAction() {
+    if (!cancelReason.trim()) return
+    setBusy(true)
+    const res = await fetch(`/api/admin/cases/${c.id}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: cancelReason }),
+    })
+    setBusy(false)
+    cancelConfirm.setOpen(false)
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      toast.error(body?.error ?? "Couldn't cancel this case.")
+      return
+    }
+    toast.success("Case cancelled.")
+    setCancelReason("")
+    router.refresh()
+  }
+
   async function resendClosureRecordAction() {
     if (!resendClosureNote.trim()) return
     setBusy(true)
@@ -350,6 +372,34 @@ export default function AdminCaseDetail(props: {
               />
               <Button size="sm" variant="destructive" onClick={() => forceCloseConfirm.setOpen(true)}>
                 Force-close case
+              </Button>
+            </>
+          )}
+        </div>
+
+        <div className="pt-3 border-t border-border space-y-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-ink-muted">Override: cancel case</p>
+          {isClosed ? (
+            <p className="text-sm text-ink-muted">This case is already closed.</p>
+          ) : (
+            <>
+              <p className="text-xs text-ink-muted">
+                Distinct from force-close — use this when the request itself is being called off (customer
+                unreachable, business unable to serve, duplicate request), not just wrapped up.
+              </p>
+              <Textarea
+                rows={2}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Reason (required, recorded in the audit log)"
+              />
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={!cancelReason.trim()}
+                onClick={() => cancelConfirm.setOpen(true)}
+              >
+                Cancel case
               </Button>
             </>
           )}
@@ -724,6 +774,16 @@ export default function AdminCaseDetail(props: {
         destructive
         busy={busy}
         onConfirm={forceClose}
+      />
+      <ConfirmDialog
+        open={cancelConfirm.open}
+        onOpenChange={cancelConfirm.setOpen}
+        title="Cancel this case?"
+        description="This immediately moves the case to Cancelled, revokes the customer's access links, and sends them a confirmation email. This cannot be undone from here."
+        confirmLabel="Cancel case"
+        destructive
+        busy={busy}
+        onConfirm={cancelCaseAction}
       />
       <ConfirmDialog
         open={resendClosureConfirm.open}

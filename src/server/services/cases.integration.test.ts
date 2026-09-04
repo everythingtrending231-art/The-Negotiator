@@ -13,12 +13,14 @@ import {
   adminForceCloseCase,
   adminReassignCase,
   assignNegotiator,
+  cancelCase,
   createCase as createCaseService,
   escalateCase,
   recordCustomerDecision,
   resendClosureRecord,
   setCaseStatus,
   unescalateCase,
+  withdrawCase,
 } from "./cases"
 
 describe("createCase", () => {
@@ -227,6 +229,41 @@ describe("adminForceCloseCase", () => {
   })
 })
 
+describe("cancelCase", () => {
+  it("cancels an active case and records the reason", async () => {
+    const negotiationCase = await createCase({ status: "NEGOTIATING" })
+    const negotiator = await createNegotiator()
+
+    const updated = await cancelCase(
+      negotiationCase.id,
+      { actorType: "NEGOTIATOR", actorId: negotiator.id },
+      "Customer unreachable after repeated attempts",
+    )
+    expect(updated.status).toBe("CANCELLED")
+
+    const audit = await testPrisma.auditLog.findFirst({ where: { caseId: negotiationCase.id, action: "CASE_CANCELLED" } })
+    expect((audit?.afterJson as { reason?: string } | null)?.reason).toBe("Customer unreachable after repeated attempts")
+  })
+
+  it("rejects an empty reason", async () => {
+    const negotiationCase = await createCase({ status: "NEGOTIATING" })
+    const admin = await createUser({ role: "ADMIN" })
+
+    await expect(
+      cancelCase(negotiationCase.id, { actorType: "ADMIN", actorId: admin.id }, "   "),
+    ).rejects.toThrow("reason is required")
+  })
+
+  it("refuses to cancel a case that is already terminal", async () => {
+    const negotiationCase = await createCase({ status: "CLOSED" })
+    const admin = await createUser({ role: "ADMIN" })
+
+    await expect(
+      cancelCase(negotiationCase.id, { actorType: "ADMIN", actorId: admin.id }, "Duplicate request"),
+    ).rejects.toThrow("already closed")
+  })
+})
+
 describe("recordCustomerDecision", () => {
   it("accepts an offer: case -> ACCEPTED, offer -> ACCEPTED, and issues a deal ticket", async () => {
     const negotiationCase = await createCase({ status: "OFFER_READY" })
@@ -364,5 +401,35 @@ describe("resendClosureRecord", () => {
     await expect(
       resendClosureRecord(negotiationCase.id, admin.id, "Verified via phone."),
     ).rejects.toThrow("no customer ticket")
+  })
+})
+
+describe("withdrawCase", () => {
+  it("withdraws a pre-offer case and sends a confirmation email", async () => {
+    const negotiationCase = await createCase({ status: "NEGOTIATING" })
+    await createTicket({ negotiationCaseId: negotiationCase.id, customerEmail: "withdraw-test@example.com" })
+
+    const updated = await withdrawCase(negotiationCase.id)
+    expect(updated.status).toBe("CANCELLED")
+
+    const audit = await testPrisma.auditLog.findFirst({ where: { caseId: negotiationCase.id, action: "CASE_WITHDRAWN" } })
+    expect(audit).not.toBeNull()
+
+    const emailCount = await testPrisma.emailLog.count({
+      where: { template: "closure-summary", to: "withdraw-test@example.com" },
+    })
+    expect(emailCount).toBe(1)
+  })
+
+  it("refuses to withdraw once an offer is ready for decision", async () => {
+    const negotiationCase = await createCase({ status: "OFFER_READY" })
+
+    await expect(withdrawCase(negotiationCase.id)).rejects.toThrow("accept or decline")
+  })
+
+  it("refuses to withdraw an already-terminal case", async () => {
+    const negotiationCase = await createCase({ status: "CLOSED" })
+
+    await expect(withdrawCase(negotiationCase.id)).rejects.toThrow("already closed")
   })
 })
