@@ -16,6 +16,7 @@ import {
   cancelCase,
   createCase as createCaseService,
   escalateCase,
+  expireOfferIfPastDue,
   recordCustomerDecision,
   resendClosureRecord,
   setCaseStatus,
@@ -359,6 +360,72 @@ describe("recordCustomerDecision", () => {
     const offer = await createOffer({ caseId: negotiationCase.id, status: "PRESENTED" })
 
     await expect(recordCustomerDecision(negotiationCase.id, offer.id, "ACCEPTED")).rejects.toThrow("already closed")
+  })
+
+  it("rejects a decision on an offer past its validUntil, expiring the case instead", async () => {
+    const negotiationCase = await createCase({ status: "OFFER_READY" })
+    const offer = await createOffer({ caseId: negotiationCase.id, status: "PRESENTED" })
+    await testPrisma.offer.update({ where: { id: offer.id }, data: { validUntil: new Date(Date.now() - 1000) } })
+
+    await expect(recordCustomerDecision(negotiationCase.id, offer.id, "ACCEPTED")).rejects.toThrow("expired")
+
+    const updatedCase = await testPrisma.negotiationCase.findUniqueOrThrow({ where: { id: negotiationCase.id } })
+    expect(updatedCase.status).toBe("EXPIRED")
+    const updatedOffer = await testPrisma.offer.findUniqueOrThrow({ where: { id: offer.id } })
+    expect(updatedOffer.status).toBe("EXPIRED")
+  })
+})
+
+describe("expireOfferIfPastDue", () => {
+  it("expires a case whose presented offer is past validUntil, revoking tokens and sending a closure email", async () => {
+    const negotiationCase = await createCase({ status: "OFFER_READY" })
+    await createTicket({ negotiationCaseId: negotiationCase.id, customerEmail: "expiry-test@example.com" })
+    const offer = await createOffer({ caseId: negotiationCase.id, status: "PRESENTED" })
+    await testPrisma.offer.update({ where: { id: offer.id }, data: { validUntil: new Date(Date.now() - 1000) } })
+
+    const updated = await expireOfferIfPastDue(negotiationCase.id)
+    expect(updated.status).toBe("EXPIRED")
+
+    const updatedOffer = await testPrisma.offer.findUniqueOrThrow({ where: { id: offer.id } })
+    expect(updatedOffer.status).toBe("EXPIRED")
+
+    const audit = await testPrisma.auditLog.findFirst({ where: { caseId: negotiationCase.id, action: "OFFER_EXPIRED" } })
+    expect(audit).not.toBeNull()
+
+    const email = await testPrisma.emailLog.findFirst({ where: { template: "closure-summary", to: "expiry-test@example.com" } })
+    expect(email).not.toBeNull()
+  })
+
+  it("leaves an offer with no validUntil untouched", async () => {
+    const negotiationCase = await createCase({ status: "OFFER_READY" })
+    const offer = await createOffer({ caseId: negotiationCase.id, status: "PRESENTED" })
+
+    const updated = await expireOfferIfPastDue(negotiationCase.id)
+    expect(updated.status).toBe("OFFER_READY")
+
+    const unchangedOffer = await testPrisma.offer.findUniqueOrThrow({ where: { id: offer.id } })
+    expect(unchangedOffer.status).toBe("PRESENTED")
+  })
+
+  it("leaves an offer that hasn't expired yet untouched", async () => {
+    const negotiationCase = await createCase({ status: "OFFER_READY" })
+    const offer = await createOffer({ caseId: negotiationCase.id, status: "PRESENTED" })
+    await testPrisma.offer.update({ where: { id: offer.id }, data: { validUntil: new Date(Date.now() + 60_000) } })
+
+    const updated = await expireOfferIfPastDue(negotiationCase.id)
+    expect(updated.status).toBe("OFFER_READY")
+  })
+
+  it("is a no-op on an already-terminal case", async () => {
+    const negotiationCase = await createCase({ status: "CLOSED" })
+    const offer = await createOffer({ caseId: negotiationCase.id, status: "PRESENTED" })
+    await testPrisma.offer.update({ where: { id: offer.id }, data: { validUntil: new Date(Date.now() - 1000) } })
+
+    const updated = await expireOfferIfPastDue(negotiationCase.id)
+    expect(updated.status).toBe("CLOSED")
+
+    const unchangedOffer = await testPrisma.offer.findUniqueOrThrow({ where: { id: offer.id } })
+    expect(unchangedOffer.status).toBe("PRESENTED")
   })
 })
 

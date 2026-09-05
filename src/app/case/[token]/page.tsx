@@ -1,4 +1,5 @@
 import { resolveAccessToken } from "@/server/services/tokens"
+import { expireOfferIfPastDue } from "@/server/services/cases"
 import CaseDashboard from "@/app/case/[token]/case-dashboard"
 import SiteHeader from "@/components/site-header"
 import ExpiredLinkCard from "@/app/case/[token]/expired-link-card"
@@ -19,6 +20,11 @@ export default async function CasePage({ params }: { params: Promise<{ token: st
   }
 
   const negotiationCase = ticket.negotiationCase
+  // Checked on every load, not just at decision time, so a customer who
+  // returns after an offer's validUntil has passed sees "expired" rather
+  // than a live Accept/Decline card (no cron in this app — see
+  // expireOfferIfPastDue's comment).
+  const { status: effectiveStatus } = await expireOfferIfPastDue(negotiationCase.id)
   // Phase 2 Stage 2: an offer only becomes customer-visible once the
   // business has confirmed it (status PROPOSED -> PRESENTED) — a
   // Negotiator-drafted PROPOSED offer must never reach the customer.
@@ -28,7 +34,7 @@ export default async function CasePage({ params }: { params: Promise<{ token: st
     <CaseDashboard
       token={token}
       caseRef={negotiationCase.publicRef}
-      status={negotiationCase.status}
+      status={effectiveStatus}
       negotiatorName={negotiationCase.assignedNegotiator?.name ?? null}
       estimatedNextUpdateAt={negotiationCase.estimatedNextUpdateAt?.toISOString() ?? null}
       customerEmail={ticket.customerEmail}
