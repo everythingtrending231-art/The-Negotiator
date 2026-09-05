@@ -608,9 +608,53 @@ export async function withdrawCase(caseId: string) {
   return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
 }
 
+// docs/02_PRODUCT_REQUIREMENTS.md §5/§7/§9, docs/03_CUSTOMER_JOURNEY.md §7,
+// docs/13_TRUST_RISK_COMPLIANCE.md §4: an offer past its validUntil must
+// stop being accept/declinable and the case must move to the terminal
+// EXPIRED status. There's no scheduler anywhere in this app (no cron, no
+// background worker), so this is checked lazily — the same "check on read"
+// shape already used for every other terminal-status transition here —
+// from the two places that matter: right before a customer decision is
+// recorded (recordCustomerDecision, below) and when the customer's own
+// dashboard loads (case/[token]/page.tsx), so they see the expired state
+// instead of a live Accept/Decline card.
+export async function expireOfferIfPastDue(caseId: string) {
+  const existing = await prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+  if (isTerminal(existing.status)) return existing
+
+  const offer = await prisma.offer.findFirst({
+    where: { caseId, status: "PRESENTED" },
+    orderBy: { createdAt: "desc" },
+  })
+  if (!offer || !offer.validUntil || offer.validUntil.getTime() > Date.now()) return existing
+
+  const { shouldSendClosureSummary } = await prisma.$transaction(async (tx) => {
+    await tx.offer.update({ where: { id: offer.id }, data: { status: "EXPIRED" } })
+    await recordAudit(tx, {
+      actorType: "SYSTEM",
+      caseId,
+      action: "OFFER_EXPIRED",
+      relatedEntityType: "Offer",
+      relatedEntityId: offer.id,
+      before: { status: offer.status },
+      after: { status: "EXPIRED" },
+      sourceChannel: "system",
+    })
+    return applyStatusChangeInTx(tx, existing, "EXPIRED", { actorType: "SYSTEM" }, "system")
+  })
+
+  if (shouldSendClosureSummary) {
+    await sendClosureSummaryEmail(caseId)
+  }
+
+  return prisma.negotiationCase.findUniqueOrThrow({ where: { id: caseId } })
+}
+
 export type CustomerDecision = "ACCEPTED" | "DECLINED" | "REQUESTED_ANOTHER_ROUND"
 
 export async function recordCustomerDecision(caseId: string, offerId: string, decision: CustomerDecision) {
+  await expireOfferIfPastDue(caseId)
+
   const existing = await prisma.negotiationCase.findUniqueOrThrow({
     where: { id: caseId },
     include: { category: true },
@@ -619,6 +663,9 @@ export async function recordCustomerDecision(caseId: string, offerId: string, de
 
   if (offer.caseId !== caseId) {
     throw new Error("This offer does not belong to this case.")
+  }
+  if (offer.status === "EXPIRED") {
+    throw new Error("This offer has expired.")
   }
   // The business must have confirmed the offer (Phase 2 Stage 2) before a
   // customer can act on it — otherwise a forged offerId for a still-PROPOSED
